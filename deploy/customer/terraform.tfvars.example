@@ -1,0 +1,37 @@
+# Copy to a local ignored terraform.tfvars; replace every example value.
+# This file cannot provision a usable environment unchanged.
+region                       = "us-ashburn-1"
+tenancy_ocid                 = "ocid1.tenancy.oc1..REPLACE_ME"
+controller_compartment_ocid  = "ocid1.compartment.oc1..REPLACE_CONTROLLER"
+pool_compartment_ocid        = "ocid1.compartment.oc1..REPLACE_POOLS"
+network_compartment_ocid     = "ocid1.compartment.oc1..REPLACE_NETWORK"
+registry_compartment_ocid    = "ocid1.compartment.oc1..REPLACE_REGISTRY"
+subnet_ids                  = ["ocid1.subnet.oc1.iad.REPLACE_FUNCTION_SUBNET"]
+scope_id                    = "pool-controller-staging-01"
+function_image              = "iad.ocir.io/REPLACE_NAMESPACE/REPLACE_REPOSITORY:REVIEWED_VERSION"
+function_image_digest       = "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
+function_shape              = "GENERIC_ARM"
+
+dry_run               = true
+enable_termination    = false
+create_iam_resources  = false
+invoker_group_ocids   = ["ocid1.group.oc1..REPLACE_APPROVED_CALLER_GROUP"]
+
+# Start with one small existing staging pool. Increase only after measurement.
+max_profiles       = 6
+max_pool_size      = 50
+max_active_pools   = 1
+max_total_ocpus    = 16
+
+pools = {
+  small = {
+    pool_id       = "ocid1.instancepool.oc1.iad.REPLACE_POOL"
+    pool_name     = "existing-pool-controller-staging-small"
+    display_name  = "Staging small workers"
+    worker_type   = "small-worker"
+    oci_shape     = "VM.Standard3.Flex"
+    ocpus         = 2
+    memory_gbs    = 16
+    max_size      = 3
+  }
+}

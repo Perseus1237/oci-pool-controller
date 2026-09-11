@@ -1,0 +1,117 @@
+{
+  "files": [
+    {
+      "bytes": 181,
+      "path": ".gitignore",
+      "sha256": "8c519c3837c70dbe765c5218dc15c2ff9346692f97a7c89fecc2503ce4033c1c"
+    },
+    {
+      "bytes": 2351,
+      "path": "DISCLAIMER.md",
+      "sha256": "84f7cd0f29e85a963b88a6411eabb9b94b76f2c38b2b3cba933b8fd5b6980a66"
+    },
+    {
+      "bytes": 1839,
+      "path": "LICENSE.txt",
+      "sha256": "f3c40a691d435929cb9db24aeb5f4564cfb4538e2671b3525008f4c8d212fd14"
+    },
+    {
+      "bytes": 3848,
+      "path": "NOTICE.md",
+      "sha256": "1402836767fb1238970fc076f8f298cc1a5eea6b23db14a05fac74c8ffd143f6"
+    },
+    {
+      "bytes": 19357,
+      "path": "PRODUCT_ARCHITECTURE.md",
+      "sha256": "6123dab33822cc6f2e9db2dd00ae5ba856129a4b84053d7c816429f326c51ec0"
+    },
+    {
+      "bytes": 8645,
+      "path": "README.md",
+      "sha256": "1a6833c9b3539894e0fe71a23eb32425436f7a78f9980b82cb10257f14488c48"
+    },
+    {
+      "bytes": 2887,
+      "path": "RELEASE_CHECKLIST.md",
+      "sha256": "1b045b33bda38a8db99aed20de9151f281a9d30bf9c2e8471aa791841889fd63"
+    },
+    {
+      "bytes": 1328,
+      "path": "deploy/customer/.terraform.lock.hcl",
+      "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
+    },
+    {
+      "bytes": 14939,
+      "path": "deploy/customer/README.md",
+      "sha256": "9e5d9f866b304709f47076dded62138ee99f753ba8ad15c0ae2ab04a928e6ad4"
+    },
+    {
+      "bytes": 10496,
+      "path": "deploy/customer/main.tf",
+      "sha256": "aaf73291963a1a998e175fc76e43891322f840274d3cff173648bf734c819919"
+    },
+    {
+      "bytes": 1230,
+      "path": "deploy/customer/outputs.tf",
+      "sha256": "a773af1b6cb5cfb42a7309c858d09d7e50933abe4d00a4474fad3a995858a0b0"
+    },
+    {
+      "bytes": 1570,
+      "path": "deploy/customer/terraform.tfvars.example",
+      "sha256": "f565ce5509779dcf761ed089076a812102382193502f377c0fd3407e2874678c"
+    },
+    {
+      "bytes": 7488,
+      "path": "deploy/customer/variables.tf",
+      "sha256": "a3707c7cb65b5d88fee3ff25aad8df288ce7fea4237e0a51d4c49385a878000e"
+    },
+    {
+      "bytes": 342,
+      "path": "deploy/customer/versions.tf",
+      "sha256": "c03ab16193388e16991f301845b53d27ae38d621f1c3c0063ea61195216e6ccc"
+    },
+    {
+      "bytes": 20561,
+      "path": "docs/RUNBOOK.md",
+      "sha256": "bcb5f755844a2f3522e2e0d6ed6df5845054f7ec8c0937003c48bc5ebae01d12"
+    },
+    {
+      "bytes": 11278,
+      "path": "docs/implementation-notes.md",
+      "sha256": "8d3d9301989fb3106a39b149485a82dd9a13b5302f4b0ddbae34339c4626be6c"
+    },
+    {
+      "bytes": 7470,
+      "path": "examples/README.md",
+      "sha256": "d07afa11acba47bc1c1917bdf5f4d07cb4af67cd6af7b2654356ce2464f9cf26"
+    },
+    {
+      "bytes": 15536,
+      "path": "examples/pool_controller.py",
+      "sha256": "bc9d33005e60c6e969762a327834594bc2b2399c3c452c7f7706763c8e395294"
+    },
+    {
+      "bytes": 13,
+      "path": "examples/requirements.txt",
+      "sha256": "085e17364081b02c8d4c55127a1c3e045ae29f34ecadbabff9743b4aca160597"
+    },
+    {
+      "bytes": 664,
+      "path": "function/Dockerfile.customer",
+      "sha256": "c290e627df5d1e67659ede4d28d5c507c063792b5261750f9202fa619aba22b9"
+    },
+    {
+      "bytes": 164302,
+      "path": "function/func.py",
+      "sha256": "3b3ebf3d0b7363cc1548f4f3a3d5e5fdaf9f34967b229f6c95ecb5730dda6fd8"
+    },
+    {
+      "bytes": 26,
+      "path": "function/requirements.txt",
+      "sha256": "8f323d8249728a9cc3ee5fdc8e1e88530bb89704be7b93990ac4e438e8916133"
+    }
+  ],
+  "release": "0.12.0-rc.1-public-draft",
+  "review": "File integrity only; licensing, provenance, security and release approvals remain pending. See RELEASE_CHECKLIST.md.",
+  "status": "not-approved-for-external-distribution"
+}
