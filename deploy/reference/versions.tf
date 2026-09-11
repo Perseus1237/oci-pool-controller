@@ -9,7 +9,7 @@ terraform {
   }
 }
 
-# Authentication comes from the customer's OCI profile or workload identity.
+# Authentication comes from the operator's OCI profile or workload identity.
 # Never put API private keys or registry passwords in Terraform variables.
 provider "oci" {
   region = var.region

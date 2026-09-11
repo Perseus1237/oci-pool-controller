@@ -23,7 +23,7 @@ variable "network_compartment_ocid" {
 }
 
 variable "registry_compartment_ocid" {
-  description = "Compartment containing the customer's existing private OCIR repository."
+  description = "Compartment containing the operator's existing private OCIR repository."
   type        = string
 }
 
@@ -58,7 +58,7 @@ variable "scope_id" {
 }
 
 variable "function_image" {
-  description = "Customer-owned private OCIR image including tag, built from the accompanying Function source."
+  description = "Operator-owned private OCIR image including tag, built from the accompanying Function source."
   type        = string
 }
 
@@ -174,7 +174,7 @@ variable "enable_termination" {
 }
 
 variable "create_iam_resources" {
-  description = "Opt in to tenancy-level group/policy creation; otherwise send IAM outputs to the customer's administrator."
+  description = "Opt in to tenancy-level group/policy creation; otherwise send IAM outputs to the operator's administrator."
   type        = bool
   default     = false
 }

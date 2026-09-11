@@ -1,4 +1,9 @@
-# OCI Pool Controller — reusable integration sample
+# OCI Pool Controller — Reference Implementation
+
+A reference implementation for integrating a scheduler or control plane with
+OCI instance pools. It demonstrates durable desired-capacity reconciliation,
+per-pool coordination, and explicit retirement of drained workers. Adapt and
+validate it for your platform; it is not a production-qualified service.
 
 > **Public-release draft — not approved for external distribution.**
 > This clean-history source snapshot is prepared for release review only.
@@ -20,7 +25,7 @@ can permanently terminate instances. Read [DISCLAIMER.md](DISCLAIMER.md),
 This draft is based on **0.12.0-rc.1**, a review and staging sample, not a
 production-qualified release. This revision introduces generic naming and
 `workerType` profile metadata; scaling and retirement safeguards are retained. The image,
-signed transport, IAM, networking and real worker runtime require a customer
+signed transport, IAM, networking and real worker runtime require an operator
 staging canary. Packaging does not deploy resources or authorize cloud spending.
 
 ## Start here
@@ -36,18 +41,18 @@ Read these guides in order:
 
 1. [Architecture and request contract](PRODUCT_ARCHITECTURE.md): demand,
    permanent retirement, ownership, request bodies and returning demand.
-2. [Customer deployment](deploy/customer/README.md): pool enrollment, image
+2. [Reference deployment](deploy/reference/README.md): pool enrollment, image
    build, IAM/network prerequisites and reviewed Terraform deployment.
 3. [Signed client integration](examples/README.md): OCI signer configuration,
    persistent outbox, demand/retirement calls and maintenance ticks.
-4. [Staging acceptance and operations](docs/RUNBOOK.md): customer decisions,
+4. [Staging acceptance and operations](docs/RUNBOOK.md): operator decisions,
    ordered canary tests, failure recovery, exact cleanup and promotion gates.
 
 The [implementation notes](docs/implementation-notes.md) provide a practical
-engineering guide to the customer API, durable caller state, scale-out,
+engineering guide to the controller API, durable caller state, scale-out,
 irreversible retirement, response handling and current safety boundaries.
 
-## Customer integration responsibilities
+## Platform integration responsibilities
 
 - Publish absolute desired **non-retiring** capacity. Persist a UUID, payload
   and increasing generation per pool before sending; retry the same request.
@@ -77,13 +82,13 @@ configuration, even a disabled one.
 ## Included
 
 - Controller-only image context and commented source.
-- Terraform referencing existing customer pools and networking; no demo fleet.
+- Terraform referencing existing operator pools and networking; no demo fleet.
 - Signed OCI invocation client with an illustrative durable local outbox.
 - Architecture, implementation notes, operations and staging acceptance guides.
 - `RELEASE_MANIFEST.json` with the SHA-256 of every included content file.
 
 Tests, lab assets, historical evidence and packaging helpers are not included
-in this public-source snapshot. The customer Dockerfile copies only Function source and
+in this public-source snapshot. The controller Dockerfile copies only Function source and
 requirements. Terraform state, plans, populated variables, credentials, outboxes
 and local attachments are not packaged.
 
@@ -101,7 +106,7 @@ review the Terraform plan. Existing deployments must explicitly retain their
 resource naming, pool keys/OCIDs, scope ID and ledger ownership where needed;
 changing defaults can rename or replace resources. Never reset retirement
 records or generation counters to adopt the new naming. See the
-[deployment guide](deploy/customer/README.md) before migration.
+[deployment guide](deploy/reference/README.md) before migration.
 
 The source still supports only its documented Intel Flex profiles. Generic
 naming does not add support for arbitrary shapes, regions, scheduler products
@@ -115,9 +120,9 @@ integrity, not release approval. Review the source, dependencies and image
 build before staging. From the source root:
 
 ```sh
-terraform -chdir=deploy/customer init -backend=false
-terraform -chdir=deploy/customer fmt -check
-terraform -chdir=deploy/customer validate
+terraform -chdir=deploy/reference init -backend=false
+terraform -chdir=deploy/reference fmt -check
+terraform -chdir=deploy/reference validate
 ```
 
 Terraform init downloads the locked provider if not cached; validation does
@@ -132,7 +137,7 @@ they do not replace manual security review. **Confirm sharing/license terms in
 Known limitations include caller-driven reconciliation, no cancellation of
 service-limit-stalled `SCALING`, and no managed `STOPPED`-worker cleanup. Shape
 caps, the 100-instance exclusion limit, bounded inline registry, ledger growth
-and unqualified fleet throughput require customer planning. Read the
+and unqualified fleet throughput require operator planning. Read the
 [architecture limits](PRODUCT_ARCHITECTURE.md#7-limits-and-failure-boundaries)
 and [production promotion gates](docs/RUNBOOK.md#9-production-promotion-gates).
 

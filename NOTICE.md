@@ -35,25 +35,25 @@ and applicable law must be considered by the legal reviewer.
 
 ## Third-party material and release scope
 
-The project originated from the OCI instance-pool scaler discussed in the
-customer meetings (https://github.com/vdeolali/oci-ipa-scaler). Confirm upstream
+The project originated from the OCI instance-pool scaler
+(https://github.com/vdeolali/oci-ipa-scaler). Confirm upstream
 provenance, authorship, and applicable notices during the release review.
 
 The OCI Python SDK, Fn Python FDK, and container base images retain their own
 licenses and notices. Review their pinned dependencies and image contents in
-the customer build pipeline; source packaging does not redistribute an image.
+the operator build pipeline; source packaging does not redistribute an image.
 
 `0.12.0-rc.1` is a generic integration package with provider-neutral worker-class
 labels (`workerType`), reusable examples and generic artifact/resource naming.
 Scaling and retirement safeguards are retained. Tests, optional generic lab
 assets and release-building tools are not included in the installation archive.
 
-This revision includes implementation notes revised for the customer API,
+This revision includes implementation notes revised for the controller API,
 caller-owned state and retries, retirement semantics and current limitations.
 Naming and metadata changes require migration review for existing deployments;
 they do not establish production qualification.
 
-Packaging does not deploy or qualify the controller. A customer-owned review,
+Packaging does not deploy or qualify the controller. An operator-owned review,
 image build/security scan, signed-invocation staging canary and production
 approval are still required. Historical lab evidence must not be described as
-validation of the complete customer integration.
+validation of the complete platform integration.

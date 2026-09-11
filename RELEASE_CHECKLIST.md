@@ -27,7 +27,7 @@ license file and passing tests do not constitute release authorization.
   dependencies and the different obligations of source versus binary delivery.
 - [ ] Review and pin approved image/dependency inputs; perform required security
   and source-disclosure checks. Do not include credentials, Terraform state,
-  internal policy documents or customer operational data.
+  internal policy documents or operator operational data.
 
 ## Technical release gates
 

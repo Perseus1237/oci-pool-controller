@@ -1,6 +1,6 @@
-# OCI Pool Controller implementation notes
+# OCI Pool Controller Reference Implementation: implementation notes
 
-This guide describes the customer integration path in the accompanying
+This guide describes the platform integration path in the accompanying
 [Function source](../function/func.py). It is **unsupported sample code for
 engineering review and staging**, not a production-qualified service.
 Read the [disclaimer](../DISCLAIMER.md), [license](../LICENSE.txt) and
@@ -18,13 +18,13 @@ retirement commitments in Object Storage, and advances one reconciliation
 attempt per call. There is no autonomous background consumer: your platform must
 continue retries and periodic maintenance calls.
 
-Use [customer Terraform](../deploy/customer/README.md) and the
+Use [reference Terraform](../deploy/reference/README.md) and the
 [signed client example](../examples/README.md). The client is an illustrative
 single-host SQLite outbox, not a distributed scheduler.
 
-## 2. Customer API surface
+## 2. Controller API surface
 
-Customer deployment uses `CONTROLLER_ONLY=true`, `FUNCTION_ROLE=control`
+Reference deployment uses `CONTROLLER_ONLY=true`, `FUNCTION_ROLE=control`
 and `AUTH_MODE=oci_iam`. Calls use the OCI Functions signed invocation endpoint,
 not the demonstration browser gateway.
 
@@ -36,8 +36,8 @@ not the demonstration browser gateway.
 | `pool_status` | Alias for `scale_test_status`; read registered pool, membership and diagnostic status. |
 
 The shared source also contains legacy demo actions and worker callback roles.
-They are not part of this customer API and are rejected in customer mode.
-Invocation permission authorizes all customer actions across the controller's
+They are not part of this controller API and are rejected in controller-only mode.
+Invocation permission authorizes all operator actions across the controller's
 registered pools; restrict that permission to approved control-plane identities.
 
 ## 3. Desired capacity and caller state
@@ -55,7 +55,7 @@ Your platform must persist:
 - Job/worker assignment and readiness state, including the permanent ban on
   assigning work to committed retirees.
 
-Customer demand requests require `desired_generation`. Allocate generations
+Operator demand requests require `desired_generation`. Allocate generations
 and write the outbox atomically in your platform's shared transactional state.
 Independent local counters on multiple replicas are not sufficient.
 
@@ -135,7 +135,7 @@ exclusions, and have matching `HarnessId` and `ScaleTestProfile` enrollment
 tags plus exact `InstanceTerminationProtectionEnabled="0"`. Missing or malformed
 values, numeric zero and `"false"` are not equivalent. New workers start with
 `"1"`. The legacy `OriginPoolId`, `DrainOperationId` and `DrainRequestedAt`
-tags are not required by this customer retirement path.
+tags are not required by this managed retirement path.
 
 Fresh identity, membership, eligibility and coordination checks precede exact
 detach. The call specifies `is_decrement_size=true` and
@@ -195,7 +195,7 @@ periodic latest-demand replay even when the desired count has not changed.
 - `ENABLE_TERMINATION=false` blocks auto-terminating detach. It does not block
   ordinary scale-out or prevent retirement commitments when dry-run is off.
 - Neither setting cancels OCI operations already accepted.
-- Customer scope checks, protected launch tags, durable state, leases, generation
+- Operator scope checks, protected launch tags, durable state, leases, generation
   checks and configured capacity guards remain required. Do not disable them
   to force progress. An attached OCI autoscaling configuration is rejected
   even when disabled; use one capacity writer per migrated pool.
@@ -214,11 +214,11 @@ and [operations runbook](RUNBOOK.md) for details and recovery procedures.
 ## 8. Before production adoption
 
 Run the [ordered staging acceptance checks](RUNBOOK.md#staging-acceptance-in-order)
-with the actual customer image, IAM, pools and worker runtime. Prove overlapping
+with the actual operator image, IAM, pools and worker runtime. Prove overlapping
 targets, busy-worker protection, irreversible retirement with returning demand,
 retry/restart behavior, real worker readiness and exact cleanup.
 
 Assign owners for shared caller state, retries, rate limits, credentials,
 monitoring, incident recovery, ledger retention and rollback. Accept or address
 the documented gaps before production approval. Historical lab tests and source
-packaging do not qualify the customer deployment or establish a latency SLA.
+packaging do not qualify the reference deployment or establish a latency SLA.

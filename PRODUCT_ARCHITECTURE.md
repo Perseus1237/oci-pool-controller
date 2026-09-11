@@ -1,4 +1,4 @@
-# OCI Pool Controller: architecture and event flows
+# OCI Pool Controller Reference Implementation: architecture and event flows
 
 ## Product outcome and release boundary
 
@@ -13,7 +13,7 @@ Keep its existing worker runtime and add a durable periodic reconciliation loop.
 The loop calls this OCI Function instead of the previous pool-capacity writer.
 Event-driven demand publishing can follow without changing the API contract.
 
-This is a **customer review and staging architecture**, not a production
+This is a **reference architecture for review and staging**, not a production
 qualification. Release `0.12.0-rc.1` introduces generic naming and `workerType`
 profile metadata while retaining scaling and retirement safeguards. Validate the image,
 configuration, signed transport and real application workers in staging. Start at
@@ -84,11 +84,11 @@ the conflicting tag blocks deletion, but does not cancel the commitment.
                                             └─────────────────────────────────────┘
 ```
 
-The customer module deploys one controller and its supporting ledger/logging;
+The reference module deploys one controller and its supporting ledger/logging;
 it references existing pools, instance configurations, and subnets. It does not
 create demo pools, browser ingress, a worker watcher, or a readiness service.
 The function image retains shared source, but controller-only mode disables
-demo and legacy routes. Customer invocation uses OCI IAM signing, not a browser
+demo and legacy routes. Operator invocation uses OCI IAM signing, not a browser
 bearer token. Invocation permission grants authority over the controller's
 whole configured pool allowlist; separate deployments/identities are needed
 for finer isolation.
@@ -96,13 +96,13 @@ for finer isolation.
 No private ingress architecture is implied by signed invocation. Your platform
 security/network owners must approve the caller endpoint and route, OCI
 service access from the Function subnet, credential lifecycle, and image pull
-access. See [customer deployment instructions](deploy/customer/README.md).
+access. See [reference deployment instructions](deploy/reference/README.md).
 
 Your platform owns the assignment/drain barrier, including job completion, durable
 results and any storage/runtime cleanup. It also owns real worker registration,
 networking and signing credentials, generation/retry ownership, capacity budgets,
 monitoring and incident recovery. The Function cannot establish job safety from
-a protection tag or verify application readiness on the customer's behalf.
+a protection tag or verify application readiness on the operator's behalf.
 
 ## 3. State and ownership
 
@@ -126,11 +126,11 @@ Scope enrollment currently retains the source's tag names `HarnessId` and
 `ScaleTestProfile`: these identify the configured controller scope and pool key.
 They are ownership checks, not extra idle signals. Enroll existing pools,
 instance configurations, launch-instance tags, and workers as documented in the
-deployment guide. Never overwrite unrelated customer tags.
+deployment guide. Never overwrite unrelated operator tags.
 
 ## 4. Actual request contract
 
-These JSON bodies are sent to the customer Function's signed invoke endpoint.
+These JSON bodies are sent to the controller Function's signed invoke endpoint.
 They are not new REST routes and do not require the browser API Gateway.
 
 New demand decision:
@@ -255,7 +255,7 @@ The safe result can temporarily fall below target before replenishment.
 
 ## 7. Limits and failure boundaries
 
-Operational pool/profile/aggregate OCPU ceilings are customer-configured, but
+Operational pool/profile/aggregate OCPU ceilings are operator-configured, but
 do not raise OCI quotas or prove throughput. The supported worker shapes remain
 `VM.Standard3.Flex` (1–32 OCPUs, up to 512 GB) and `VM.Optimized3.Flex`
 (1–18 OCPUs, up to 256 GB). OCPU and memory values must be integers, with memory
@@ -264,7 +264,7 @@ configuration must match. These are package validation caps, not
 a statement of OCI's full shape offerings. Each request supports at most 100
 exclusions; a larger list requires a separately reviewed design change.
 
-The inline pool registry must fit the customer module's conservative Function
+The inline pool registry must fit the reference module's conservative Function
 configuration-size guard (approximately 4,000 bytes); raising `max_profiles`
 does not bypass that guard. An external registry and retirement-tombstone
 compaction/sharding are not implemented. Separate
@@ -283,7 +283,7 @@ guards do not provide a global fleet limit.
   retiring but is not deleted until the inconsistency is safely resolved.
 - **Ledger/IAM failures:** fail closed. Unknown state is not permission to
   terminate; retain request IDs and evidence for operator recovery.
-- **Self-reclaim:** legacy watcher/terminator routes are disabled in customer
+- **Self-reclaim:** legacy watcher/terminator routes are disabled in controller-only
   mode. A future worker/event endpoint
   needs caller identity binding, safe eligibility evidence and the same pool
   coordinator. Low CPU or OS-down alone does not prove job-safe retirement.
@@ -291,9 +291,9 @@ guards do not provide a global fleet limit.
   real pool count, target-change rate, ledger contention, OCI throttles, and
   end-to-end dispatchable readiness in your platform staging.
 
-## 8. Customer validation
+## 8. Validation
 
-Follow the [deployment guide](deploy/customer/README.md), integrate the
+Follow the [deployment guide](deploy/reference/README.md), integrate the
 [signed client](examples/README.md), and record the ordered acceptance checks
 in the [runbook](docs/RUNBOOK.md). Qualify the exact source/image, identity,
 region, pools and worker runtime. Record demand-to-dispatchable latency

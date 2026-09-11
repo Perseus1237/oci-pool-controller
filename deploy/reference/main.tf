@@ -88,7 +88,7 @@ resource "oci_identity_policy" "faas_service" {
   count          = var.create_iam_resources ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = "${var.name_prefix}-faas-${local.suffix}"
-  description    = "Customer controller Function networking and private image pull"
+  description    = "Operator controller Function networking and private image pull"
   statements     = local.faas_policy_statements
 }
 
@@ -176,14 +176,14 @@ resource "oci_identity_policy" "invokers" {
   count          = var.create_iam_resources && length(var.invoker_group_ocids) > 0 ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = "${var.name_prefix}-invoke-${local.suffix}"
-  description    = "Existing customer groups may invoke this controller Function only"
+  description    = "Existing operator groups may invoke this controller Function only"
   statements     = local.invoker_policy_statements
 }
 
 resource "oci_logging_log_group" "controller" {
   compartment_id = var.controller_compartment_ocid
   display_name   = "${var.name_prefix}-logs-${local.suffix}"
-  description    = "Customer controller Function invocation logs"
+  description    = "Operator controller Function invocation logs"
   freeform_tags  = local.tags
 }
 

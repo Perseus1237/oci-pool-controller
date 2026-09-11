@@ -820,7 +820,7 @@ def _config(environ: Mapping[str, str]) -> Config:
     ):
         raise HarnessError(500, "invalid_configuration", "request-ledger namespace or bucket is invalid")
 
-    # Customer deployment ceilings are operator configuration, never caller
+    # Reference deployment ceilings are operator configuration, never caller
     # input. Raising them is not evidence of tested throughput or OCI capacity.
     max_profiles = MAX_SCALE_TEST_PROFILES
     max_instances = HARD_MAX_SCALE_TEST_POOL_SIZE
@@ -828,14 +828,14 @@ def _config(environ: Mapping[str, str]) -> Config:
         max_profiles = _parse_nonnegative_int(environ.get("CONTROLLER_MAX_PROFILES", max_profiles), "CONTROLLER_MAX_PROFILES")
         max_instances = _parse_nonnegative_int(environ.get("CONTROLLER_MAX_POOL_SIZE", max_instances), "CONTROLLER_MAX_POOL_SIZE")
         if min(max_profiles, max_instances) < 1 or not ledger_namespace:
-            raise HarnessError(500, "invalid_configuration", "customer mode requires positive ceilings and a durable ledger")
+            raise HarnessError(500, "invalid_configuration", "controller-only mode requires positive ceilings and a durable ledger")
     profiles = _parse_scale_test_profiles(
         environ.get("SCALE_TEST_PROFILES_JSON"), max_profiles=max_profiles,
         max_pool_size=max_instances, require_pool_ids=controller_only,
     )
     budget_enabled = _parse_bool(environ.get("SCALE_TEST_BUDGET_LIMITS_ENABLED"), "SCALE_TEST_BUDGET_LIMITS_ENABLED", default=True)
     if controller_only and (not profiles or not budget_enabled):
-        raise HarnessError(500, "invalid_configuration", "customer mode requires registered pools and enabled capacity guards")
+        raise HarnessError(500, "invalid_configuration", "controller-only mode requires registered pools and enabled capacity guards")
 
     return Config(
         configured_pool_id=configured_pool_id,
@@ -925,13 +925,13 @@ def _authenticate(
     headers: Mapping[str, Any],
     config: Config,
 ) -> None:
-    """Use POC tokens or the customer deployment's OCI InvokeFunction boundary.
+    """Use POC tokens or the reference deployment's OCI InvokeFunction boundary.
 
     In oci_iam mode OCI authenticates and authorizes the signed request before
     running this Function. No body/header claim is treated as identity here.
     This mode MUST NOT be exposed through an unauthenticated gateway, proxy,
     Fn development server, or broadly authorized invocation principal. Anyone
-    allowed to invoke this Function can use all customer controller actions.
+    allowed to invoke this Function can use all controller actions.
     """
 
     if config.auth_mode == "oci_iam":
@@ -1043,7 +1043,7 @@ def _resolve_scale_test_scope(
     unrelated pool in the same compartment.
     """
 
-    # Customer registrations pin identity: a pool recreated with the same name
+    # Operator registrations pin identity: a pool recreated with the same name
     # and tags must never inherit authority over the old pool's demand ledger.
     if profile.pool_id:
         pool_id = profile.pool_id
@@ -1471,7 +1471,7 @@ def _scale_test_configuration_check(
     if not isinstance(configuration_tags, Mapping) or not isinstance(launch_tags, Mapping):
         return False, "OCI returned malformed instance-configuration tags."
     if scope.config.controller_only and launch_tags.get(PROTECTION_TAG) != "1":
-        return False, "Customer worker launch configuration must start with protection tag exactly 1."
+        return False, "Worker launch configuration must start with protection tag exactly 1."
     if (
         configuration_tags.get(HARNESS_TAG) != scope.config.harness_id
         or configuration_tags.get(SCALE_TEST_PROFILE_TAG) != profile.key
@@ -2211,7 +2211,7 @@ def _retirement_snapshot(
 ) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
     """Separate retiring (including detached-but-terminating) from usable workers.
 
-    Direct customer tag writes are discovered on reconciliation. An existing
+    Direct operator tag writes are discovered on reconciliation. An existing
     commitment stays retiring even if a tag is later changed out of band; that
     conflict blocks detach, never makes the instance schedulable again.
     """
@@ -2844,7 +2844,7 @@ def _reconcile_pool(
     exclusions = _reconcile_exclusions(payload)
     desired_generation = _reconcile_desired_generation(payload)
     if config.controller_only and desired_generation is None:
-        raise HarnessError(400, "invalid_desired_generation", "customer requests require desired_generation")
+        raise HarnessError(400, "invalid_desired_generation", "controller-only requests require desired_generation")
     fingerprint = _request_fingerprint(profile, desired, exclusions, desired_generation)
     request_value = {
         "poolKey": profile.key,

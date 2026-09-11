@@ -19,13 +19,13 @@ python3 -m venv .venv-client
 .venv-client/bin/python -m pip install -r examples/requirements.txt
 ```
 
-Configure a customer-owned OCI machine identity/profile using your approved
+Configure an operator-owned OCI machine identity/profile using your approved
 credential distribution and rotation mechanism. Restrict config/private-key
 permissions; never commit credentials or enable SDK HTTP debug logging in
 production. The CLI reads the standard OCI config/profile. `OCITransport` also
 accepts a preconfigured `FunctionsInvokeClient` for an approved alternate signer.
 
-Use customer deployment outputs for `--function-id` and the **Functions invoke
+Use reference deployment outputs for `--function-id` and the **Functions invoke
 base endpoint**, not the UI/gateway URL. These commands contain placeholders;
 replace them before execution. Keep one persistent outbox per environment and
 Function registry in an access-controlled directory. Do not reset it on restart.
@@ -134,7 +134,7 @@ when replacing the illustrative outbox: stable retry payloads, persisted
 generations across restart, supersession, completed-demand maintenance replay,
 fail-closed errors, irreversible retirement and IAM response envelopes.
 
-Run the customer-owned [staging acceptance checks](../docs/RUNBOOK.md) with the
+Run the operator-owned [staging acceptance checks](../docs/RUNBOOK.md) with the
 reviewed image and credentials. Source tests do not establish real invocation,
 Your platform registration, or application job readiness.
 

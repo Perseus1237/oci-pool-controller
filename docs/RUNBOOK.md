@@ -6,12 +6,12 @@ Release `0.12.0-rc.1` supports review and bounded staging. Start with the packag
 [README](../README.md) and [request contract](../PRODUCT_ARCHITECTURE.md).
 This runbook does not authorize a live deployment, tag change, termination,
 quota increase or rollback. Obtain the
-customer change owner's approval for the exact environment and actions.
+operator change owner's approval for the exact environment and actions.
 
 This is unsupported sample code, not an Oracle-supported product or service.
 Read the [sample-code disclaimer](../DISCLAIMER.md), [license](../LICENSE.txt), and
 [release notice](../NOTICE.md). Sample packaging and test results do not replace
-customer security, operational, or legal review.
+operator security, operational, or legal review.
 
 Retirement is permanent. Never assign work to a committed worker, re-protect
 it to cancel retirement, delete its registry entry, or lower the OCI pool size
@@ -20,7 +20,7 @@ must finish draining before committing `"0"`.
 
 ## 1. Pre-deployment checklist
 
-Use the [customer deployment guide](../deploy/customer/README.md).
+Use the [reference deployment guide](../deploy/reference/README.md).
 
 - Approve the source/image version and immutable digest. Have the release owner
   and appropriate legal approver confirm provenance, licensing/distribution
@@ -50,7 +50,7 @@ Use the [customer deployment guide](../deploy/customer/README.md).
   stop-assignment barrier and durable job results/runtime teardown before retirement.
   Review the guest OS shutdown sequence: managed retirement requires RUNNING
   workers and does not implement STOPPED-worker cleanup.
-- Accept retire-first/no surge and its possible capacity gap. Set customer
+- Accept retire-first/no surge and its possible capacity gap. Set operator
   latency and throughput acceptance targets, including the retirement wait.
 
 Check the [shape, exclusion and registry limits](../PRODUCT_ARCHITECTURE.md#7-limits-and-failure-boundaries)
@@ -62,7 +62,7 @@ and explicit budget allocation; they do not share an aggregate fleet guard.
 1. Begin with `dry_run=true`, `enable_termination=false`, and a reviewed
    Terraform plan. Dry-run checks are not evidence of real retirement writes.
 2. Enroll the staging resources according to the deployment guide. Replace
-   immutable instance configurations through the customer-owned change process.
+   immutable instance configurations through the operator-owned change process.
 3. Verify signed `pool_status`, request validation and application envelope
    handling. Confirm unauthorized/wrong-pool requests cannot mutate.
 4. Quiesce your platform's policy updates for this pool. Record latest real demand.
@@ -84,10 +84,10 @@ Never leave OCI autoscaling and this controller writing the same pool.
 
 ### Staging acceptance, in order
 
-Record these details in a customer-owned results artifact or change record:
+Record these details in an operator-owned results artifact or change record:
 
 ```text
-Release/commit, package manifest/checksum, customer image digest:
+Release/commit, package manifest/checksum, operator image digest:
 Region, exact pool IDs, worker image/runtime/registration version:
 Test window, capacity/OCPU/cost caps, deadline and cleanup owner:
 Scheduler, runtime, security/platform and operations reviewers:
@@ -166,7 +166,7 @@ Use read-only checks first; do not click retry/drain repeatedly while diagnosing
 - Cost guard headroom, service limits, quotas and capacity evidence.
 
 Keep credentials, patient/genomic data and job payloads out of support exports.
-Ledger records, resource IDs and logs still require customer access controls.
+Ledger records, resource IDs and logs still require operator access controls.
 Do not clear a lease or edit the ledger manually to force progress.
 
 ## 5. Symptom-to-action guide
@@ -183,7 +183,7 @@ Do not clear a lease or edit the ledger manually to force progress.
 | Retirement instance unreadable/404 | Absence may be authorization/visibility, not verified termination. | Check exact scope/IAM and authoritative lifecycle evidence. Do not treat every 404 as successful deletion. |
 | `autoscaling_configuration_attached` | Another scaling authority may exist, even if disabled. | Stop competing policy writes and complete approved cutover; never bypass the guard. |
 | `oci_authorization_failed` | Exact detach permissions may be missing. | Review required delete/update permissions and scope; no blind retry loop or broad emergency grants. |
-| Operational budget/configuration rejection | Customer limits, shape or enrollment do not permit request. | Review requested capacity and config with the owner; do not disable scope or budget controls. |
+| Operational budget/configuration rejection | Operator limits, shape or enrollment do not permit request. | Review requested capacity and config with the owner; do not disable scope or budget controls. |
 | UUID payload/generation conflict | Caller replay contract is broken or publisher is stale. | Restore immutable outbox record; allocate a new generation only for a genuinely new decision. |
 | `superseded` | A newer desired generation is authoritative. | Stop replaying old demand; let the latest request continue committed retirements. |
 | Ledger invalid/unavailable | Authoritative desired/retirement or coordination cannot be trusted. | Fail closed, preserve evidence, restore access/consistent state under a reviewed recovery plan. |
@@ -198,7 +198,7 @@ state. This release does **not** cancel OCI's outstanding launch attempts.
    quota, regional capacity, permission and transient throttle.
 2. Suppress hot retries/duplicate requests. Keep the immutable desired state
    and use the agreed backoff/deadline/alert policy.
-3. Notify the customer capacity owner/SRE with current target, real membership,
+3. Notify the operator capacity owner/SRE with current target, real membership,
    pending retirement IDs and OCI evidence.
 4. Obtain approval for any quota/capacity change or OCI-supported recovery.
    A limit increase may permit launches and spending; it is not read-only.
@@ -244,7 +244,7 @@ Only clean up workers explicitly placed in the approved disposable test scope.
    Terminated VMs cannot be restarted; do not imply cleanup is merely a stop.
 
 Do not use `terraform destroy` as a pool-drain procedure. Existing pools are not
-owned by the customer controller stack, and destruction of ledger state while
+owned by the controller stack, and destruction of ledger state while
 retirement is active is unsafe.
 
 ## 8. Upgrade and rollback
@@ -260,7 +260,7 @@ make an older release appear compatible.
 
 If returning to legacy autoscaling is required, obtain a separate cutover plan:
 resolve accepted retirements and OCI work first, prove the new controller cannot
-mutate, reconcile customer demand and membership, then approve restoration of
+mutate, reconcile operator demand and membership, then approve restoration of
 one legacy writer. A paused system with retained intent is safer than two
 controllers or pretending destructive commitments were canceled.
 
@@ -269,7 +269,7 @@ controllers or pretending destructive commitments were canceled.
 Packaging and local checks do not satisfy these gates. Assign an owner and
 record acceptance or blocking follow-up for each before fleet promotion:
 
-- Validate actual customer IAM/signing, networking, image/dependency security,
+- Validate actual operator IAM/signing, networking, image/dependency security,
   secret rotation and state/log access. Approve operations/support ownership,
   budgets, incident response and real platform readiness/latency SLOs.
 - Measure the intended pool count, worker configurations, simultaneous changes,

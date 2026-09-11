@@ -16,74 +16,74 @@
       "sha256": "f3c40a691d435929cb9db24aeb5f4564cfb4538e2671b3525008f4c8d212fd14"
     },
     {
-      "bytes": 3848,
+      "bytes": 3816,
       "path": "NOTICE.md",
-      "sha256": "1402836767fb1238970fc076f8f298cc1a5eea6b23db14a05fac74c8ffd143f6"
+      "sha256": "5aeddb116cbe86a6959e9e106471ce670228623c78b9ff14248613e57a66d2fc"
     },
     {
-      "bytes": 19357,
+      "bytes": 19392,
       "path": "PRODUCT_ARCHITECTURE.md",
-      "sha256": "6123dab33822cc6f2e9db2dd00ae5ba856129a4b84053d7c816429f326c51ec0"
+      "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 8645,
+      "bytes": 8958,
       "path": "README.md",
-      "sha256": "1a6833c9b3539894e0fe71a23eb32425436f7a78f9980b82cb10257f14488c48"
+      "sha256": "ef1651aa619f19a8d88f536a54d53ebb46136bf5ed83b45fe4c7b7d9ee048c57"
     },
     {
       "bytes": 2887,
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "1b045b33bda38a8db99aed20de9151f281a9d30bf9c2e8471aa791841889fd63"
+      "sha256": "7b57cd59035c5d2d3c995cba611743fef5e2fa94bb685d1f8ceb54e80e4db74a"
     },
     {
       "bytes": 1328,
-      "path": "deploy/customer/.terraform.lock.hcl",
+      "path": "deploy/reference/.terraform.lock.hcl",
       "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
     },
     {
-      "bytes": 14939,
-      "path": "deploy/customer/README.md",
-      "sha256": "9e5d9f866b304709f47076dded62138ee99f753ba8ad15c0ae2ab04a928e6ad4"
+      "bytes": 14918,
+      "path": "deploy/reference/README.md",
+      "sha256": "3c2f17730b0b7640402408988c760b8c26e7e67b46cbf43e973b42ea12628e1e"
     },
     {
       "bytes": 10496,
-      "path": "deploy/customer/main.tf",
-      "sha256": "aaf73291963a1a998e175fc76e43891322f840274d3cff173648bf734c819919"
+      "path": "deploy/reference/main.tf",
+      "sha256": "a3f999f7acfdd1d457935911726cee8cf6dcea13afebc82d6cc74fa6eb78fab1"
     },
     {
       "bytes": 1230,
-      "path": "deploy/customer/outputs.tf",
+      "path": "deploy/reference/outputs.tf",
       "sha256": "a773af1b6cb5cfb42a7309c858d09d7e50933abe4d00a4474fad3a995858a0b0"
     },
     {
       "bytes": 1570,
-      "path": "deploy/customer/terraform.tfvars.example",
+      "path": "deploy/reference/terraform.tfvars.example",
       "sha256": "f565ce5509779dcf761ed089076a812102382193502f377c0fd3407e2874678c"
     },
     {
       "bytes": 7488,
-      "path": "deploy/customer/variables.tf",
-      "sha256": "a3707c7cb65b5d88fee3ff25aad8df288ce7fea4237e0a51d4c49385a878000e"
+      "path": "deploy/reference/variables.tf",
+      "sha256": "cf861512e28af36b6e2a3474af5d9915b5c34b0f7135f76a37905a12056ed2d1"
     },
     {
       "bytes": 342,
-      "path": "deploy/customer/versions.tf",
-      "sha256": "c03ab16193388e16991f301845b53d27ae38d621f1c3c0063ea61195216e6ccc"
+      "path": "deploy/reference/versions.tf",
+      "sha256": "2ccf9fba82033d9b5cf77187f989f210208f74b91ab6829fc3ae068e13169669"
     },
     {
-      "bytes": 20561,
+      "bytes": 20555,
       "path": "docs/RUNBOOK.md",
-      "sha256": "bcb5f755844a2f3522e2e0d6ed6df5845054f7ec8c0937003c48bc5ebae01d12"
+      "sha256": "add06ed8558c29d7a81bcbcdc0ae63aa2f71a54dc077466ea88ddc8dc2a9e51f"
     },
     {
-      "bytes": 11278,
+      "bytes": 11318,
       "path": "docs/implementation-notes.md",
-      "sha256": "8d3d9301989fb3106a39b149485a82dd9a13b5302f4b0ddbae34339c4626be6c"
+      "sha256": "120bf81dd8b47f60d7117aea0a258dd7abf136b1704bbaeb47e5b2f41781f947"
     },
     {
-      "bytes": 7470,
+      "bytes": 7472,
       "path": "examples/README.md",
-      "sha256": "d07afa11acba47bc1c1917bdf5f4d07cb4af67cd6af7b2654356ce2464f9cf26"
+      "sha256": "4e9b5d88ae3d9885c00e71b245d214bfbaf337073537ce907d177396886d19a6"
     },
     {
       "bytes": 15536,
@@ -96,14 +96,14 @@
       "sha256": "085e17364081b02c8d4c55127a1c3e045ae29f34ecadbabff9743b4aca160597"
     },
     {
-      "bytes": 664,
-      "path": "function/Dockerfile.customer",
-      "sha256": "c290e627df5d1e67659ede4d28d5c507c063792b5261750f9202fa619aba22b9"
+      "bytes": 666,
+      "path": "function/Dockerfile",
+      "sha256": "ea68ddf0cb744ee92ebada5a981c6a1a3f083cfd815e13d89b19bba4dcc56ed1"
     },
     {
-      "bytes": 164302,
+      "bytes": 164307,
       "path": "function/func.py",
-      "sha256": "3b3ebf3d0b7363cc1548f4f3a3d5e5fdaf9f34967b229f6c95ecb5730dda6fd8"
+      "sha256": "3b347cb35b1ec2e2bfd5b123ccad6174cb40e5745ec222e862915402d362e060"
     },
     {
       "bytes": 26,
@@ -111,7 +111,7 @@
       "sha256": "8f323d8249728a9cc3ee5fdc8e1e88530bb89704be7b93990ac4e438e8916133"
     }
   ],
-  "release": "0.12.0-rc.1-public-draft",
+  "release": "0.12.0-rc.2-reference-draft",
   "review": "File integrity only; licensing, provenance, security and release approvals remain pending. See RELEASE_CHECKLIST.md.",
   "status": "not-approved-for-external-distribution"
 }
