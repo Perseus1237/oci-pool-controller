@@ -6,44 +6,9 @@
       "sha256": "8c519c3837c70dbe765c5218dc15c2ff9346692f97a7c89fecc2503ce4033c1c"
     },
     {
-      "bytes": 2351,
-      "path": "DISCLAIMER.md",
-      "sha256": "84f7cd0f29e85a963b88a6411eabb9b94b76f2c38b2b3cba933b8fd5b6980a66"
-    },
-    {
-      "bytes": 1839,
-      "path": "LICENSE.txt",
-      "sha256": "f3c40a691d435929cb9db24aeb5f4564cfb4538e2671b3525008f4c8d212fd14"
-    },
-    {
-      "bytes": 3816,
-      "path": "NOTICE.md",
-      "sha256": "5aeddb116cbe86a6959e9e106471ce670228623c78b9ff14248613e57a66d2fc"
-    },
-    {
-      "bytes": 19392,
-      "path": "PRODUCT_ARCHITECTURE.md",
-      "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
-    },
-    {
-      "bytes": 10229,
-      "path": "README.md",
-      "sha256": "e4136685c9a4b5cd98d55a5b8bb4b919f43ab39d5796982fac853192244a1ee8"
-    },
-    {
-      "bytes": 2887,
-      "path": "RELEASE_CHECKLIST.md",
-      "sha256": "7b57cd59035c5d2d3c995cba611743fef5e2fa94bb685d1f8ceb54e80e4db74a"
-    },
-    {
       "bytes": 1328,
       "path": "deploy/reference/.terraform.lock.hcl",
       "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
-    },
-    {
-      "bytes": 14918,
-      "path": "deploy/reference/README.md",
-      "sha256": "3c2f17730b0b7640402408988c760b8c26e7e67b46cbf43e973b42ea12628e1e"
     },
     {
       "bytes": 10496,
@@ -54,6 +19,16 @@
       "bytes": 1230,
       "path": "deploy/reference/outputs.tf",
       "sha256": "a773af1b6cb5cfb42a7309c858d09d7e50933abe4d00a4474fad3a995858a0b0"
+    },
+    {
+      "bytes": 16089,
+      "path": "deploy/reference/README.md",
+      "sha256": "cee7ff6133b362edfecdee4c7e4b5e06f66128acaaa76bb07a54993322feceb9"
+    },
+    {
+      "path": "deploy/reference/schema.yaml",
+      "bytes": 4723,
+      "sha256": "4239b2358f3c5cf5737ce0a942f97a237f9669a5f7e80389edd4ada4b3c31eff"
     },
     {
       "bytes": 1570,
@@ -71,9 +46,9 @@
       "sha256": "2ccf9fba82033d9b5cf77187f989f210208f74b91ab6829fc3ae068e13169669"
     },
     {
-      "bytes": 20555,
-      "path": "docs/RUNBOOK.md",
-      "sha256": "add06ed8558c29d7a81bcbcdc0ae63aa2f71a54dc077466ea88ddc8dc2a9e51f"
+      "bytes": 2351,
+      "path": "DISCLAIMER.md",
+      "sha256": "84f7cd0f29e85a963b88a6411eabb9b94b76f2c38b2b3cba933b8fd5b6980a66"
     },
     {
       "bytes": 11318,
@@ -81,14 +56,19 @@
       "sha256": "120bf81dd8b47f60d7117aea0a258dd7abf136b1704bbaeb47e5b2f41781f947"
     },
     {
-      "bytes": 7472,
-      "path": "examples/README.md",
-      "sha256": "4e9b5d88ae3d9885c00e71b245d214bfbaf337073537ce907d177396886d19a6"
+      "bytes": 20555,
+      "path": "docs/RUNBOOK.md",
+      "sha256": "add06ed8558c29d7a81bcbcdc0ae63aa2f71a54dc077466ea88ddc8dc2a9e51f"
     },
     {
       "bytes": 15536,
       "path": "examples/pool_controller.py",
       "sha256": "bc9d33005e60c6e969762a327834594bc2b2399c3c452c7f7706763c8e395294"
+    },
+    {
+      "bytes": 7472,
+      "path": "examples/README.md",
+      "sha256": "4e9b5d88ae3d9885c00e71b245d214bfbaf337073537ce907d177396886d19a6"
     },
     {
       "bytes": 13,
@@ -109,9 +89,39 @@
       "bytes": 26,
       "path": "function/requirements.txt",
       "sha256": "8f323d8249728a9cc3ee5fdc8e1e88530bb89704be7b93990ac4e438e8916133"
+    },
+    {
+      "bytes": 1839,
+      "path": "LICENSE.txt",
+      "sha256": "f3c40a691d435929cb9db24aeb5f4564cfb4538e2671b3525008f4c8d212fd14"
+    },
+    {
+      "bytes": 3882,
+      "path": "NOTICE.md",
+      "sha256": "a527f94ab23632b121e1ddccdacb5dc36cabceb66eb7a5f9cd26b3aeec5624ec"
+    },
+    {
+      "bytes": 19392,
+      "path": "PRODUCT_ARCHITECTURE.md",
+      "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
+    },
+    {
+      "bytes": 10579,
+      "path": "README.md",
+      "sha256": "0ec564e8702b887c0ead09f746f9b55489e8cfb2c2611326db38a0bd9d42f7af"
+    },
+    {
+      "bytes": 2887,
+      "path": "RELEASE_CHECKLIST.md",
+      "sha256": "7b57cd59035c5d2d3c995cba611743fef5e2fa94bb685d1f8ceb54e80e4db74a"
+    },
+    {
+      "path": "scripts/package-reference.py",
+      "bytes": 4389,
+      "sha256": "cb5dc1ec1dc4d20daebb1277f01678278043043fe997a20d7e086ba848f76e08"
     }
   ],
-  "release": "0.12.0-rc.2-reference-draft",
+  "release": "0.12.0-rc.4-reference-draft",
   "review": "File integrity only; licensing, provenance, security and release approvals remain pending. See RELEASE_CHECKLIST.md.",
   "status": "not-approved-for-external-distribution"
 }

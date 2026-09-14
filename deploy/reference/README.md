@@ -79,6 +79,28 @@ Permissions are bounded to specified compartments, with Object Storage writes li
 
 ## 5. Deploy dry-run and perform signed checks
 
+### Resource Manager option
+
+Run `python3 scripts/package-reference.py` from the repository root. Upload the
+generated `*-resource-manager.zip` to Resource Manager, or use a private deploy
+link for the same ZIP. Choose Terraform **1.5.x** and leave the working directory
+at the ZIP root. The included schema groups the required variables, pool map,
+image configuration and safety controls. No real tenancy values are bundled.
+
+Provide an existing private image and matching digest/architecture, along with
+the reviewed infrastructure values. The Resource Manager execution identity
+needs permission to create the defined resources; runtime Function IAM is a
+separate requirement. Do not put signing keys or registry tokens in variables.
+
+Deselect **Run apply**, create the stack, run a **Plan**, and review it before
+applying. A successful plan is not a runtime test. After apply, perform signed
+status and dry-run checks below. Do not enroll a pool into a second live writer.
+The packaged root configuration is identical to this module; do not manage the
+same deployed resources from both local Terraform state and a Resource Manager
+stack.
+
+### Local Terraform option
+
 From `deploy/reference`, after configuring the approved Terraform backend and OCI deployer credentials:
 
 ```sh

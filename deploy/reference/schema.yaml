@@ -1,0 +1,170 @@
+schemaVersion: 1.1.0
+version: "20260914"
+title: OCI Pool Controller Reference Implementation
+description: Unsupported reference implementation for existing OCI instance pools.
+informationalText: >-
+  Start with dry-run enabled and termination disabled. This stack does not
+  build the Function image or create worker pools. Deselect Run apply and
+  review a plan first. Release and staging approvals remain required.
+variableGroups:
+  - title: Existing infrastructure
+    variables: [region, tenancy_ocid, controller_compartment_ocid, pool_compartment_ocid, network_compartment_ocid, registry_compartment_ocid, subnet_ids]
+  - title: Reviewed Function image
+    variables: [function_image, function_image_digest, function_shape]
+  - title: Pool enrollment
+    variables: [scope_id, pools]
+  - title: Safety and capacity
+    variables: [dry_run, enable_termination, max_profiles, max_pool_size, max_active_pools, max_total_ocpus]
+  - title: IAM and resource naming
+    variables: [create_iam_resources, invoker_group_ocids, name_prefix, dynamic_group_name, ledger_bucket_name]
+variables:
+  region:
+    type: oci:identity:region:name
+    required: true
+    title: Region
+  tenancy_ocid:
+    type: string
+    required: true
+    title: Tenancy OCID
+  controller_compartment_ocid:
+    type: oci:identity:compartment:id
+    required: true
+    title: Controller compartment
+  pool_compartment_ocid:
+    type: oci:identity:compartment:id
+    required: true
+    title: Existing pool compartment
+  network_compartment_ocid:
+    type: oci:identity:compartment:id
+    required: true
+    title: Existing network compartment
+  registry_compartment_ocid:
+    type: oci:identity:compartment:id
+    required: true
+    title: Private OCIR compartment
+  subnet_ids:
+    type: list
+    valueType: subnet_item
+    required: true
+    title: Existing Function subnet OCIDs
+  subnet_item:
+    type: string
+    visible: false
+  function_image:
+    type: string
+    required: true
+    title: Private OCIR image address including tag
+  function_image_digest:
+    type: string
+    required: true
+    title: Reviewed image digest (sha256)
+  function_shape:
+    type: enum
+    enum: [GENERIC_ARM, GENERIC_X86]
+    default: GENERIC_ARM
+    title: Function architecture (must match image)
+  scope_id:
+    type: string
+    required: true
+    title: Existing HarnessId scope tag
+  pools:
+    type: map
+    valueType: pool_entry
+    required: true
+    title: Existing pool allowlist (keys match ScaleTestProfile)
+  pool_entry:
+    type: object
+    visible: false
+    attributes: [pool_id, pool_name, display_name, worker_type, oci_shape, ocpus, memory_gbs, max_size]
+  pool_id:
+    type: string
+    actualName: pool_id
+    visible: false
+    required: true
+  pool_name:
+    type: string
+    actualName: pool_name
+    visible: false
+    required: true
+  display_name:
+    type: string
+    actualName: display_name
+    visible: false
+  worker_type:
+    type: string
+    actualName: worker_type
+    visible: false
+    required: true
+  oci_shape:
+    type: enum
+    actualName: oci_shape
+    visible: false
+    enum: [VM.Standard3.Flex, VM.Optimized3.Flex]
+    required: true
+  ocpus:
+    type: number
+    actualName: ocpus
+    visible: false
+    required: true
+  memory_gbs:
+    type: number
+    actualName: memory_gbs
+    visible: false
+    required: true
+  max_size:
+    type: number
+    actualName: max_size
+    visible: false
+    required: true
+  dry_run:
+    type: boolean
+    default: true
+    title: Dry-run (keep enabled for initial validation)
+  enable_termination:
+    type: boolean
+    default: false
+    title: Enable targeted termination (leave disabled initially)
+  create_iam_resources:
+    type: boolean
+    default: false
+    title: Create reviewed IAM policies and dynamic group
+  invoker_group_ocids:
+    type: list
+    valueType: invoker_group_item
+    title: Existing approved invoking group OCIDs
+  invoker_group_item:
+    type: string
+    visible: false
+  max_profiles:
+    type: number
+    default: 6
+    title: Registry profile ceiling
+  max_pool_size:
+    type: number
+    default: 50
+    title: Per-profile worker ceiling
+  max_active_pools:
+    type: number
+    default: 1
+    title: Simultaneously active pool ceiling
+  max_total_ocpus:
+    type: number
+    default: 16
+    title: Aggregate OCPU ceiling
+  name_prefix:
+    type: string
+    default: oci-pool-controller
+    title: Resource name prefix
+  dynamic_group_name:
+    type: string
+    title: Optional existing IAM dynamic-group name
+  ledger_bucket_name:
+    type: string
+    title: Optional dedicated ledger bucket name
+outputs:
+  function_ocid:
+    type: ocid
+    title: Controller Function
+  invoke_endpoint:
+    type: string
+    title: Signed Functions invoke endpoint

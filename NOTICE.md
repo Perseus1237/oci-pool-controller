@@ -45,8 +45,9 @@ the operator build pipeline; source packaging does not redistribute an image.
 
 `0.12.0-rc.1` is a generic integration package with provider-neutral worker-class
 labels (`workerType`), reusable examples and generic artifact/resource naming.
-Scaling and retirement safeguards are retained. Tests, optional generic lab
-assets and release-building tools are not included in the installation archive.
+Scaling and retirement safeguards are retained. Tests and optional generic lab
+assets are not included. A manifest-verified packaging helper is included for
+building the source archive and Resource Manager deployment ZIP.
 
 This revision includes implementation notes revised for the controller API,
 caller-owned state and retries, retirement semantics and current limitations.

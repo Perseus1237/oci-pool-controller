@@ -87,7 +87,7 @@ configuration, even a disabled one.
 - Architecture, implementation notes, operations and staging acceptance guides.
 - `RELEASE_MANIFEST.json` with the SHA-256 of every included content file.
 
-Tests, lab assets, historical evidence and packaging helpers are not included
+Tests, lab assets and historical evidence are not included
 in this public-source snapshot. The controller Dockerfile copies only Function source and
 requirements. Terraform state, plans, populated variables, credentials, outboxes
 and local attachments are not packaged.
@@ -98,16 +98,25 @@ See Oracle's [Using the Deploy to Oracle Cloud Button](https://docs.oracle.com/e
 for instructions on linking a Terraform configuration ZIP to the OCI Resource
 Manager **Create stack** page.
 
-For this reference implementation, prepare a ZIP with the Terraform files from
-`deploy/reference/` at its root. The full source `.tar.gz` package is not the
-Terraform ZIP required by the button. Follow the [deployment guide](deploy/reference/README.md)
+Build the source archive and Resource Manager ZIP from the verified manifest:
+
+```sh
+python3 scripts/package-reference.py
+```
+
+The `*-resource-manager.zip` includes root Terraform files and a `schema.yaml`
+deployment form; original source paths remain available for the linked guides.
+The full source `.tar.gz` is for review, not Resource Manager. Follow the [deployment guide](deploy/reference/README.md)
 first: existing pools/networking, a built private Function image and digest,
 IAM permissions, and deployment variables are still required.
 
-A live deploy button is not configured yet: it needs an approved, accessible
-ZIP URL. Oracle supports Object Storage pre-authenticated request (PAR) URLs
-for this purpose. Treat a PAR as a bearer link; do not commit it to this
-repository. An expired PAR will no longer work for new stack creation.
+For private distribution, use an approved read-only, single-object Object
+Storage pre-authenticated request (PAR) for the deployment ZIP. Open
+`https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=<URL-encoded-PAR>`
+or place that URL behind Oracle's deploy-button image in a privately shared
+launch page. Treat a PAR as a bearer link; do not commit it to this repository.
+An expired PAR will no longer work for new stack creation. The repository does
+not embed a permanent public download or credentials.
 
 When creating the stack, deselect **Run apply**, review the variables, and run
 and review a plan before applying. Keep `dry_run = true` and
