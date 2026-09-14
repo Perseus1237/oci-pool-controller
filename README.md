@@ -26,8 +26,7 @@ The separately shared private deploy link preloads the ZIP until its PAR expires
 You are responsible for security review, testing, adaptation, deployment,
 operation and resulting cloud costs. No support, maintenance, update or
 security-fix commitment is made unless separately agreed in writing. This code
-can permanently terminate instances. Read [DISCLAIMER.md](DISCLAIMER.md),
-[LICENSE.txt](LICENSE.txt) and [NOTICE.md](NOTICE.md) before use or distribution.
+can permanently terminate instances. Read [DISCLAIMER.md](DISCLAIMER.md) and [NOTICE.md](NOTICE.md) before use or distribution.
 
 This draft is based on **0.12.0-rc.1**, a review and staging sample, not a
 production-qualified release. This revision introduces generic naming and
