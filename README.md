@@ -28,11 +28,6 @@ operation and resulting cloud costs. No support, maintenance, update or
 security-fix commitment is made unless separately agreed in writing. This code
 can permanently terminate instances. Read [DISCLAIMER.md](DISCLAIMER.md) and [NOTICE.md](NOTICE.md) before use or distribution.
 
-This draft is based on **0.12.0-rc.1**, a review and staging sample, not a
-production-qualified release. This revision introduces generic naming and
-`workerType` profile metadata; scaling and retirement safeguards are retained. The image,
-signed transport, IAM, networking and real worker runtime require an operator
-staging canary. Packaging does not deploy resources or authorize cloud spending.
 
 ## Start here
 
