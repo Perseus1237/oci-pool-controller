@@ -1,6 +1,6 @@
-# OCI Pool Controller — Reference Implementation
+# OCI Pool Controller POC — Reference Implementation
 
-A reference implementation for integrating a scheduler or control plane with
+A sample code reference implementation for integrating a scheduler or control plane with
 OCI instance pools. It demonstrates durable desired-capacity reconciliation,
 per-pool coordination, and explicit retirement of drained workers. Adapt and
 validate it for your platform; it is not a production-qualified service.
