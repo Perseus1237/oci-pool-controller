@@ -92,6 +92,28 @@ in this public-source snapshot. The controller Dockerfile copies only Function s
 requirements. Terraform state, plans, populated variables, credentials, outboxes
 and local attachments are not packaged.
 
+## Deploy to Oracle Cloud with Resource Manager
+
+See Oracle's [Using the Deploy to Oracle Cloud Button](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Tasks/deploybutton.htm)
+for instructions on linking a Terraform configuration ZIP to the OCI Resource
+Manager **Create stack** page.
+
+For this reference implementation, prepare a ZIP with the Terraform files from
+`deploy/reference/` at its root. The full source `.tar.gz` package is not the
+Terraform ZIP required by the button. Follow the [deployment guide](deploy/reference/README.md)
+first: existing pools/networking, a built private Function image and digest,
+IAM permissions, and deployment variables are still required.
+
+A live deploy button is not configured yet: it needs an approved, accessible
+ZIP URL. Oracle supports Object Storage pre-authenticated request (PAR) URLs
+for this purpose. Treat a PAR as a bearer link; do not commit it to this
+repository. An expired PAR will no longer work for new stack creation.
+
+When creating the stack, deselect **Run apply**, review the variables, and run
+and review a plan before applying. Keep `dry_run = true` and
+`enable_termination = false` for initial validation. A deploy button does not
+replace release approval or the staging checks in the runbook.
+
 ## Configuration and upgrade boundary
 
 Profiles use `worker_type` in Terraform and `workerType` in Function profile
