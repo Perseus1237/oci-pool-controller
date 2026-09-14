@@ -106,9 +106,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 10579,
+      "bytes": 11106,
       "path": "README.md",
-      "sha256": "0ec564e8702b887c0ead09f746f9b55489e8cfb2c2611326db38a0bd9d42f7af"
+      "sha256": "96834c524750d4a1f355cc26efa54c4839f37fbd55e98806a72b3524d9c0cf63"
     },
     {
       "bytes": 2887,
@@ -121,7 +121,7 @@
       "sha256": "cb5dc1ec1dc4d20daebb1277f01678278043043fe997a20d7e086ba848f76e08"
     }
   ],
-  "release": "0.12.0-rc.4-reference-draft",
+  "release": "0.12.0-rc.5-reference-draft",
   "review": "File integrity only; licensing, provenance, security and release approvals remain pending. See RELEASE_CHECKLIST.md.",
   "status": "not-approved-for-external-distribution"
 }

@@ -10,6 +10,13 @@ validate it for your platform; it is not a production-qualified service.
 > Complete the [release checklist](RELEASE_CHECKLIST.md) before publishing,
 > pushing to an external repository, or distributing source or images.
 
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create)
+
+**ZIP upload required:** this button opens Resource Manager's Create Stack page;
+it does not preload this private repository. Upload the `*-resource-manager.zip`
+package, then follow the [deployment instructions](#deploy-to-oracle-cloud-with-resource-manager).
+The separately shared private deploy link preloads the ZIP until its PAR expires.
+
 ## Sample Code Disclaimer
 
 **Unsupported sample code—not an Oracle-supported product or service.**
