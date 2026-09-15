@@ -19,12 +19,11 @@ are not a warranty, security certification or guarantee of future performance.
 
 ORACLE AND ITS AFFILIATES DO NOT PROVIDE ANY WARRANTY WHATSOEVER, EXPRESS OR IMPLIED, FOR ANY SOFTWARE, MATERIAL OR CONTENT OF ANY KIND CONTAINED OR PRODUCED WITHIN THIS REPOSITORY, AND IN PARTICULAR SPECIFICALLY DISCLAIM ANY AND ALL IMPLIED WARRANTIES OF TITLE, NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A PARTICULAR PURPOSE. FURTHERMORE, ORACLE AND ITS AFFILIATES DO NOT REPRESENT THAT ANY CUSTOMARY SECURITY REVIEW HAS BEEN PERFORMED WITH RESPECT TO ANY SOFTWARE, MATERIAL OR CONTENT CONTAINED OR PRODUCED WITHIN THIS REPOSITORY. IN ADDITION, AND WITHOUT LIMITING THE FOREGOING, THIRD PARTIES MAY HAVE POSTED SOFTWARE, MATERIAL OR CONTENT TO THIS REPOSITORY WITHOUT ANY REVIEW. USE AT YOUR OWN RISK.
 
-## License and scope
+## Scope and release notice
 
-See [LICENSE.txt](LICENSE.txt) for the complete UPL Version 1.0 license, including its warranty
-and liability provisions, and [NOTICE.md](NOTICE.md) for third-party and
-release-approval requirements. This disclaimer does not modify the UPL or any
-separate signed agreement governing Oracle services. It is not a legal opinion
-or a guarantee that a claim cannot be brought or that liability is excluded in
-every circumstance. The appropriate Oracle legal/repository owner must approve
-the wording, copyright attribution and licensing authority before distribution.
+See [NOTICE.md](NOTICE.md) for third-party and release-approval requirements.
+This disclaimer does not modify any separate signed agreement governing Oracle
+services. It is not a legal opinion or a guarantee that a claim cannot be
+brought or that liability is excluded in every circumstance. The appropriate
+Oracle legal/repository owner must approve the wording, copyright attribution
+and licensing authority before distribution.

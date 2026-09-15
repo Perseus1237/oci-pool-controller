@@ -12,10 +12,19 @@ validate it for your platform; it is not a production-qualified service.
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create)
 
-**ZIP upload required:** this button opens Resource Manager's Create Stack page;
-it does not preload this private repository. Upload the `*-resource-manager.zip`
-package, then follow the [deployment instructions](#deploy-to-oracle-cloud-with-resource-manager).
-The separately shared private deploy link preloads the ZIP until its PAR expires.
+**Private-package launch:** this repository is private, so the badge cannot give
+Resource Manager access to its GitHub archive. Build the
+`*-resource-manager.zip` package and either upload it or distribute it through
+an approved read-only Object Storage PAR. The Terraform **working directory is
+exactly `deploy/reference`** inside that ZIP. A private one-click launch link
+must use this complete form:
+
+```text
+https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=<URL-encoded-PAR>&workingDirectory=deploy%2Freference
+```
+
+The separately shared private deploy link preloads the ZIP until its PAR
+expires. Do not put a PAR or credentials in this repository.
 
 ## Sample Code Disclaimer
 
@@ -105,15 +114,16 @@ Build the source archive and Resource Manager ZIP from the verified manifest:
 python3 scripts/package-reference.py
 ```
 
-The `*-resource-manager.zip` includes root Terraform files and a `schema.yaml`
-deployment form; original source paths remain available for the linked guides.
-The full source `.tar.gz` is for review, not Resource Manager. Follow the [deployment guide](deploy/reference/README.md)
+The `*-resource-manager.zip` preserves the source layout. In Resource Manager,
+select **`deploy/reference`** as the working directory; this directory contains
+the Terraform files and `schema.yaml` that render the deployment form. The full
+source `.tar.gz` is for review, not Resource Manager. Follow the [deployment guide](deploy/reference/README.md)
 first: existing pools/networking, a built private Function image and digest,
 IAM permissions, and deployment variables are still required.
 
 For private distribution, use an approved read-only, single-object Object
 Storage pre-authenticated request (PAR) for the deployment ZIP. Open
-`https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=<URL-encoded-PAR>`
+`https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=<URL-encoded-PAR>&workingDirectory=deploy%2Freference`
 or place that URL behind Oracle's deploy-button image in a privately shared
 launch page. Treat a PAR as a bearer link; do not commit it to this repository.
 An expired PAR will no longer work for new stack creation. The repository does

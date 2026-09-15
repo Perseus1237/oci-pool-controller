@@ -21,14 +21,14 @@
       "sha256": "a773af1b6cb5cfb42a7309c858d09d7e50933abe4d00a4474fad3a995858a0b0"
     },
     {
-      "bytes": 16089,
+      "bytes": 16172,
       "path": "deploy/reference/README.md",
-      "sha256": "cee7ff6133b362edfecdee4c7e4b5e06f66128acaaa76bb07a54993322feceb9"
+      "sha256": "36ff4ea71de22b9b96c9efb53d00fd34f3fa3222fb19c8e7de14ee9b8b0a20d5"
     },
     {
       "path": "deploy/reference/schema.yaml",
-      "bytes": 4723,
-      "sha256": "4239b2358f3c5cf5737ce0a942f97a237f9669a5f7e80389edd4ada4b3c31eff"
+      "bytes": 4906,
+      "sha256": "34ffcc479c6c84caa4fb77960c525c62442fd8964d458c4184e0a4565f5f1411"
     },
     {
       "bytes": 1570,
@@ -46,19 +46,19 @@
       "sha256": "2ccf9fba82033d9b5cf77187f989f210208f74b91ab6829fc3ae068e13169669"
     },
     {
-      "bytes": 2351,
+      "bytes": 2225,
       "path": "DISCLAIMER.md",
-      "sha256": "84f7cd0f29e85a963b88a6411eabb9b94b76f2c38b2b3cba933b8fd5b6980a66"
+      "sha256": "8606ef4dd0b936932168cb4dcd7c40164341dbf88f8851a8a8d8ac082f246998"
     },
     {
-      "bytes": 11318,
+      "bytes": 11291,
       "path": "docs/implementation-notes.md",
-      "sha256": "120bf81dd8b47f60d7117aea0a258dd7abf136b1704bbaeb47e5b2f41781f947"
+      "sha256": "cf0d479beb49973d59cf650b10412af63083a2d01b98a5423f4aa1e4fbd98f3f"
     },
     {
-      "bytes": 20555,
+      "bytes": 20527,
       "path": "docs/RUNBOOK.md",
-      "sha256": "add06ed8558c29d7a81bcbcdc0ae63aa2f71a54dc077466ea88ddc8dc2a9e51f"
+      "sha256": "3b2d653ebeeeddfa9854725365e330c56e8d8e0de388cc839d8e91a1d2c6fc55"
     },
     {
       "bytes": 15536,
@@ -91,14 +91,9 @@
       "sha256": "8f323d8249728a9cc3ee5fdc8e1e88530bb89704be7b93990ac4e438e8916133"
     },
     {
-      "bytes": 1839,
-      "path": "LICENSE.txt",
-      "sha256": "f3c40a691d435929cb9db24aeb5f4564cfb4538e2671b3525008f4c8d212fd14"
-    },
-    {
-      "bytes": 3882,
+      "bytes": 1286,
       "path": "NOTICE.md",
-      "sha256": "a527f94ab23632b121e1ddccdacb5dc36cabceb66eb7a5f9cd26b3aeec5624ec"
+      "sha256": "439c812bdf733fefe258b5c878ba62649ee85a924c61911da59848418e4e648a"
     },
     {
       "bytes": 19392,
@@ -106,22 +101,22 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 11106,
+      "bytes": 10882,
       "path": "README.md",
-      "sha256": "96834c524750d4a1f355cc26efa54c4839f37fbd55e98806a72b3524d9c0cf63"
+      "sha256": "b7a3589e6f5634df7411a3c5875945fddf226194e69a9af3b54ee27d5d5c4f5c"
     },
     {
-      "bytes": 2887,
+      "bytes": 2889,
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "7b57cd59035c5d2d3c995cba611743fef5e2fa94bb685d1f8ceb54e80e4db74a"
+      "sha256": "1f6dda9b67a830011287f2f5bea5ed87404ac6894611e73346fefd27e0ba066d"
     },
     {
       "path": "scripts/package-reference.py",
-      "bytes": 4389,
-      "sha256": "cb5dc1ec1dc4d20daebb1277f01678278043043fe997a20d7e086ba848f76e08"
+      "bytes": 4330,
+      "sha256": "aaee1a996b9a4edeef29aa71472703e1e067737ff445f19aae305b41f1a02c72"
     }
   ],
-  "release": "0.12.0-rc.5-reference-draft",
+  "release": "0.12.0-rc.6-reference-draft",
   "review": "File integrity only; licensing, provenance, security and release approvals remain pending. See RELEASE_CHECKLIST.md.",
   "status": "not-approved-for-external-distribution"
 }

@@ -9,8 +9,8 @@ quota increase or rollback. Obtain the
 operator change owner's approval for the exact environment and actions.
 
 This is unsupported sample code, not an Oracle-supported product or service.
-Read the [sample-code disclaimer](../DISCLAIMER.md), [license](../LICENSE.txt), and
-[release notice](../NOTICE.md). Sample packaging and test results do not replace
+Read the [sample-code disclaimer](../DISCLAIMER.md) and [release notice](../NOTICE.md).
+Sample packaging and test results do not replace
 operator security, operational, or legal review.
 
 Retirement is permanent. Never assign work to a committed worker, re-protect

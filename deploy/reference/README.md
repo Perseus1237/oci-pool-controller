@@ -2,8 +2,8 @@
 
 This staging module deploys the **0.12.0-rc.1 controller**, not the demo tenancy. It creates one OCI Function/application, a dedicated private versioned Object Storage ledger, the initial aggregate lease object, invocation logging, and optionally narrowly scoped IAM resources. It does **not** create, import, resize or retag any instance pool, worker, instance configuration, network, registry, API Gateway, UI, worker terminator or readiness Function.
 
-This is unsupported sample code; see [DISCLAIMER.md](../../DISCLAIMER.md),
-[LICENSE.txt](../../LICENSE.txt), and [NOTICE.md](../../NOTICE.md). `0.12.0-rc.1` introduces
+This is unsupported sample code; see [DISCLAIMER.md](../../DISCLAIMER.md) and
+[NOTICE.md](../../NOTICE.md). `0.12.0-rc.1` introduces
 generic naming and `workerType` metadata while retaining scaling/retirement safeguards.
 
 ### Existing deployment migration
@@ -83,9 +83,11 @@ Permissions are bounded to specified compartments, with Object Storage writes li
 
 Run `python3 scripts/package-reference.py` from the repository root. Upload the
 generated `*-resource-manager.zip` to Resource Manager, or use a private deploy
-link for the same ZIP. Choose Terraform **1.5.x** and leave the working directory
-at the ZIP root. The included schema groups the required variables, pool map,
-image configuration and safety controls. No real tenancy values are bundled.
+link for the same ZIP. Choose Terraform **1.5.x** and select
+**`deploy/reference`** as the working directory. The included `schema.yaml` in
+that directory groups the required variables, pool map, image configuration and
+safety controls. No real tenancy values are bundled. A one-click private PAR
+link must include `&workingDirectory=deploy%2Freference`.
 
 Provide an existing private image and matching digest/architecture, along with
 the reviewed infrastructure values. The Resource Manager execution identity

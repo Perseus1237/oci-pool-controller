@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build reviewed source and Resource Manager artifacts; never upload or deploy.
 
-Only manifest-listed files are eligible. ZIP root Terraform files are exact
-copies of deploy/reference so the deploy button needs no working-directory
-override. Original paths remain available for documentation and CLI usage.
+Only manifest-listed files are eligible. The Resource Manager ZIP preserves
+the source layout, so its Terraform working directory is deploy/reference.
+Original paths remain available for documentation and CLI usage.
 """
 
 import argparse
@@ -15,6 +15,9 @@ from pathlib import Path
 import re
 import tarfile
 import zipfile
+
+
+RESOURCE_MANAGER_WORKING_DIRECTORY = "deploy/reference"
 
 
 def main():
@@ -61,10 +64,9 @@ def main():
                 info.mode = 0o644
                 archive.addfile(info, io.BytesIO(data))
     zip_files = dict(files)
-    for name in ("main.tf", "variables.tf", "versions.tf", "outputs.tf", ".terraform.lock.hcl", "schema.yaml"):
-        zip_files[name] = files[f"deploy/reference/{name}"]
     zip_files["RESOURCE_MANAGER_MANIFEST.json"] = (json.dumps({
         "release": version,
+        "working_directory": RESOURCE_MANAGER_WORKING_DIRECTORY,
         "files": [{"path": n, "sha256": hashlib.sha256(b).hexdigest(), "bytes": len(b)} for n, b in sorted(zip_files.items())],
     }, indent=2) + "\n").encode()
     zip_buffer = io.BytesIO()

@@ -160,7 +160,10 @@ variables:
     title: Optional existing IAM dynamic-group name
   ledger_bucket_name:
     type: string
-    title: Optional dedicated ledger bucket name
+    title: Optional Object Storage ledger-bucket name
+    description: >-
+      This stack creates a dedicated private, versioned ledger bucket. Leave
+      blank to use the generated name; do not provide an existing shared bucket.
 outputs:
   function_ocid:
     type: ocid

@@ -3,8 +3,8 @@
 This guide describes the platform integration path in the accompanying
 [Function source](../function/func.py). It is **unsupported sample code for
 engineering review and staging**, not a production-qualified service.
-Read the [disclaimer](../DISCLAIMER.md), [license](../LICENSE.txt) and
-[release notice](../NOTICE.md) before use.
+Read the [disclaimer](../DISCLAIMER.md) and [release notice](../NOTICE.md)
+before use.
 
 ## 1. Integration approach
 

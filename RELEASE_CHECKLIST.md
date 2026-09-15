@@ -17,7 +17,7 @@ license file and passing tests do not constitute release authorization.
 
 ## Source and dependency preparation
 
-- [ ] Review `LICENSE.txt` and the unsupported-sample notices with Legal.
+- [ ] Review licensing terms and the unsupported-sample notices with Legal.
 - [ ] Apply approved copyright/license headers to all substantive source files.
   Root notices alone do not complete this task.
 - [ ] Prepare and review `THIRD_PARTY_LICENSES.txt`. It is not supplied in this
