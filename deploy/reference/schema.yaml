@@ -22,7 +22,7 @@ variableGroups:
     variables: [pools]
   - title: Advanced discovery overrides
     visible: ${auto_discover_pools}
-    variables: [pool_overrides]
+    variables: [customize_pool_settings, pool_overrides]
   - title: Safety and capacity
     variables: [dry_run, enable_termination, max_profiles, max_pool_size, max_active_pools, max_total_ocpus]
   - title: IAM and resource naming
@@ -149,13 +149,19 @@ variables:
     actualName: max_size
     visible: false
     required: true
+  customize_pool_settings:
+    type: boolean
+    default: false
+    title: Customize per-pool settings
+    description: Show optional overrides for individual discovered profiles. Leave unchecked for a new deployment using defaults. Saved overrides still apply when hidden; remove their entries to restore defaults.
   pool_overrides:
     type: map
     valueType: pool_override_entry
     required: false
     default: {}
+    visible: ${customize_pool_settings}
     title: Optional per-profile overrides
-    description: Leave empty to use discovery defaults. Add a ScaleTestProfile key only to override its worker type or approved maximum size.
+    description: The key is an existing ScaleTestProfile tag, not the placeholder key1. Add entries only for custom worker types or maximum sizes. Remove unused rows completely; an empty row requires a key.
   pool_override_entry:
     type: object
     visible: false

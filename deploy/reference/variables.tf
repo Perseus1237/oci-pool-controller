@@ -132,6 +132,12 @@ variable "default_pool_max_size" {
   }
 }
 
+variable "customize_pool_settings" {
+  description = "Resource Manager display control only: show optional per-profile override fields. Hiding fields does not disable or erase saved pool_overrides; remove entries to restore discovery defaults."
+  type        = bool
+  default     = false
+}
+
 variable "pool_overrides" {
   description = "Optional discovery overrides keyed by ScaleTestProfile. Set only the worker_type or approved max_size values that should differ from discovery defaults."
   type = map(object({

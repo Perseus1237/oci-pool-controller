@@ -53,8 +53,15 @@ its pool owner before discovery can succeed.
 Each pool's `ScaleTestProfile` tag becomes its profile key and default
 `worker_type`. `default_pool_max_size` sets each pool's capacity ceiling and
 defaults to **3**; it is not inferred from current pool size and is not a desired
-size request. Optional `pool_overrides`, keyed by `ScaleTestProfile`, can set a
-different `max_size` or `worker_type` for individual profiles. For example:
+size request. Leave **Customize per-pool settings** unchecked to keep the
+optional override rows hidden in a new Resource Manager form. Check it only to
+view or edit `pool_overrides`, keyed by the existing `ScaleTestProfile` tag (not
+the placeholder `key1`). Remove unused rows completely instead of leaving an
+empty key. Each entry can set a different `max_size` or `worker_type`.
+
+The checkbox controls visibility only: saved overrides still apply when hidden.
+Remove their entries to restore defaults. CLI deployments can set
+`pool_overrides` directly without setting `customize_pool_settings`. For example:
 
 ```hcl
 auto_discover_pools   = true

@@ -124,9 +124,27 @@ outputs:
         self.assertIn("    required: true", variable_lines(schema, "pools"))
         overrides = group_lines(schema, "Advanced discovery overrides")
         self.assertIn("    visible: ${auto_discover_pools}", overrides)
-        self.assertIn("    variables: [pool_overrides]", overrides)
+        self.assertIn("    variables: [customize_pool_settings, pool_overrides]", overrides)
         self.assertEqual(default_value(schema, "pool_overrides"), {})
         self.assertIn("    required: false", variable_lines(schema, "pool_overrides"))
+
+    def test_pool_customization_toggle_hides_editor_without_disabling_saved_overrides(self):
+        schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
+        self.assertIs(default_value(schema, "customize_pool_settings"), False)
+        toggle = variable_lines(schema, "customize_pool_settings")
+        self.assertIn("    type: boolean", toggle)
+        self.assertIn("    title: Customize per-pool settings", toggle)
+        self.assertIn("    visible: ${customize_pool_settings}", variable_lines(schema, "pool_overrides"))
+        terraform = (ROOT / "deploy/reference/variables.tf").read_text(encoding="utf-8")
+        declaration = re.search(r'^variable "customize_pool_settings" \{(.*?)^\}',
+                                terraform, re.MULTILINE | re.DOTALL)
+        self.assertIsNotNone(declaration)
+        self.assertRegex(declaration.group(1), r"\bdefault\s*=\s*false\b")
+        enrollment = (ROOT / "deploy/reference/enrollment.tf").read_text(encoding="utf-8")
+        self.assertRegex(enrollment, r"(?m)^\s*pool_overrides\s*=\s*var\.pool_overrides\s*$")
+        self.assertNotIn("customize_pool_settings", enrollment)
+        for source in (ROOT / "deploy/reference/modules/enrollment").glob("*.tf"):
+            self.assertNotIn("customize_pool_settings", source.read_text(encoding="utf-8"))
 
     def test_form_variables_match_terraform_and_override_attributes_remain_optional(self):
         schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")

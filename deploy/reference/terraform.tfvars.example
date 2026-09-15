@@ -33,6 +33,8 @@ default_pool_max_size = 3 # Approved ceiling per pool, not its current/desired s
 
 # Optional overrides keyed by an existing ScaleTestProfile tag. Without an
 # override, worker_type is the profile key and max_size is the default above.
+# In Resource Manager, check Customize per-pool settings to reveal the rows.
+# This is a display control only: hiding saved overrides does not disable them.
 # pool_overrides = {
 #   small = { max_size = 5, worker_type = "small-worker" }
 # }

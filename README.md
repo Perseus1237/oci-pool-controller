@@ -254,7 +254,11 @@ JSON/status output. These are descriptive worker-class labels, not OCI shape
 identifiers; Terraform derives shape, OCPUs and memory from the attached
 immutable instance configuration and validates them at plan time.
 With automatic discovery, `worker_type` defaults to the `ScaleTestProfile` key;
-`pool_overrides` can set its label or maximum size per profile. The Plan and
+`pool_overrides` can set its label or maximum size per profile. In Resource
+Manager, **Customize per-pool settings** is unchecked by default and reveals
+the optional rows only when selected. Remove unused rows rather than entering
+a placeholder key. This checkbox only controls visibility; saved overrides
+remain active until their entries are removed. The Plan and
 outputs list the exact pool IDs that will be pinned in the Function. Discovery
 runs on each new Plan, not while the Function runs: review pool additions and
 removals before every Apply. Missing or conflicting enrollment tags must be

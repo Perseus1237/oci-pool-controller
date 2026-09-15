@@ -21,24 +21,24 @@
       "sha256": "76a656e5a5bf0a65f9ca992ea65dd88331455e1b82ebb01d20c45ada3a05c27d"
     },
     {
-      "bytes": 24996,
+      "bytes": 25451,
       "path": "deploy/reference/README.md",
-      "sha256": "7cc13573734465a193a2d897f123d64ec60b7ac6c8d500c7f3beb522bce6e1a7"
+      "sha256": "87bf214e7a93406b6be51b92866df0533573cb75d59a47be709b2cca6ef52791"
     },
     {
       "path": "deploy/reference/schema.yaml",
-      "bytes": 8175,
-      "sha256": "54d012f9c399319aa1fc866975a91bcd7ff7b193aaa1f0a2b28901f091c1fca6"
+      "bytes": 8621,
+      "sha256": "7bec3280e7c02f8afbb976e43bf977881b748554300e66200dac5261d0ace006"
     },
     {
-      "bytes": 2717,
+      "bytes": 2874,
       "path": "deploy/reference/terraform.tfvars.example",
-      "sha256": "d269d39a7e6c808f4fec3a67adbb893cf923c4d8051a29551007d6addc562af2"
+      "sha256": "ffbd8e392ac08167d69d0f4a1eb2ff8c5e726ea0dddfe516752518f441ea6f19"
     },
     {
-      "bytes": 10138,
+      "bytes": 10429,
       "path": "deploy/reference/variables.tf",
-      "sha256": "d7eaa79b449940915b50a38d933c8848f631e1458b1fc0963bd20e3a4dd51fff"
+      "sha256": "c0200ceb55f609b0144a27d475c2ea47256b5fb47a588afa4e6f7b2bca5afb78"
     },
     {
       "bytes": 590,
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 18659,
+      "bytes": 18948,
       "path": "README.md",
-      "sha256": "753a61ba426710e210908d80845ecfe076f581a379fd773d4f3b8992543e4a04"
+      "sha256": "0ac42e5a55041680b070b5a6fb2ec6cbadee10f54ed30d1f4c09dcd477412ff6"
     },
     {
       "bytes": 2889,
@@ -137,8 +137,8 @@
     },
     {
       "path": "tests/test_resource_manager_deployment.py",
-      "bytes": 9953,
-      "sha256": "a72b9a52d61c2a991ac80c68650615191a30e4ef45411d3d3e0d56cf6cbe0956"
+      "bytes": 11296,
+      "sha256": "352bc17c4c711ce9f236d46ff2b3622a135a4ca9b0f673ed0150329034498687"
     },
     {
       "path": "deploy/reference/enrollment.tf",
