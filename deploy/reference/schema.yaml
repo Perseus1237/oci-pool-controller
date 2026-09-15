@@ -8,7 +8,7 @@ informationalText: >-
   review a plan first. Release and staging approvals remain required.
 variableGroups:
   - title: Existing infrastructure
-    variables: [region, tenancy_ocid, controller_compartment_ocid, pool_compartment_ocid, network_compartment_ocid, registry_compartment_ocid, subnet_ids]
+    variables: [region, tenancy_ocid, controller_compartment_ocid, pool_compartment_ocid, network_compartment_ocid, function_vcn_ocid, registry_compartment_ocid, subnet_ids]
   - title: Reviewed Function image
     variables: [function_image, function_image_digest, function_shape]
   - title: Pool enrollment
@@ -38,6 +38,12 @@ variables:
     type: oci:identity:compartment:id
     required: true
     title: Existing network compartment
+  function_vcn_ocid:
+    type: oci:core:vcn:id
+    required: true
+    title: Existing Function VCN
+    dependsOn:
+      compartmentId: ${network_compartment_ocid}
   registry_compartment_ocid:
     type: oci:identity:compartment:id
     required: true
@@ -46,10 +52,14 @@ variables:
     type: list
     valueType: subnet_item
     required: true
-    title: Existing Function subnet OCIDs
+    title: Existing Function subnets
+    description: Select existing Function subnets with OCI-service connectivity.
   subnet_item:
-    type: string
+    type: oci:core:subnet:id
     visible: false
+    dependsOn:
+      compartmentId: ${network_compartment_ocid}
+      vcnId: ${function_vcn_ocid}
   function_image:
     type: string
     required: true
@@ -72,43 +82,19 @@ variables:
     valueType: pool_entry
     required: true
     title: Existing pool allowlist (keys match ScaleTestProfile)
+    description: Terraform reads and verifies each selected pool and its immutable launch configuration at plan time. Enter only the pinned pool OCID, worker type and approved maximum size.
   pool_entry:
     type: object
     visible: false
-    attributes: [pool_id, pool_name, display_name, worker_type, oci_shape, ocpus, memory_gbs, max_size]
+    attributes: [pool_id, worker_type, max_size]
   pool_id:
     type: string
     actualName: pool_id
     visible: false
     required: true
-  pool_name:
-    type: string
-    actualName: pool_name
-    visible: false
-    required: true
-  display_name:
-    type: string
-    actualName: display_name
-    visible: false
   worker_type:
     type: string
     actualName: worker_type
-    visible: false
-    required: true
-  oci_shape:
-    type: enum
-    actualName: oci_shape
-    visible: false
-    enum: [VM.Standard3.Flex, VM.Optimized3.Flex]
-    required: true
-  ocpus:
-    type: number
-    actualName: ocpus
-    visible: false
-    required: true
-  memory_gbs:
-    type: number
-    actualName: memory_gbs
     visible: false
     required: true
   max_size:

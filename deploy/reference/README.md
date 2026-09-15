@@ -8,11 +8,12 @@ generic naming and `workerType` metadata while retaining scaling/retirement safe
 
 ### Existing deployment migration
 
-The Terraform pool map now uses `worker_type`, which is serialized as
-`workerType` in `SCALE_TEST_PROFILES_JSON` and returned by pool status. Update
-your input mapping and status consumers together; the previous customized
-metadata field is not accepted as a substitute. Scale requests and retirement
-actions retain their existing fields.
+Pool enrollment now asks only for a pinned `pool_id`, `worker_type` and
+`max_size`. During plan, Terraform reads the pool and its immutable instance
+configuration to derive the real pool name, Intel shape, OCPUs and memory, then
+checks the compartment and enrollment/protection tags. `worker_type` is still
+serialized as `workerType` in `SCALE_TEST_PROFILES_JSON` and returned by pool
+status. Scale requests and retirement actions retain their existing fields.
 
 The default `name_prefix` is now `oci-pool-controller`. For an existing
 deployment, explicitly retain its current prefix, `scope_id`, pool keys/OCIDs
@@ -26,10 +27,11 @@ Build the accompanying Function source using the controller Dockerfile; do not s
 ## 1. Prerequisites and ownership
 
 - Review the [integration overview](../../README.md), [client example](../../examples/README.md), and [operations runbook](../../docs/RUNBOOK.md) before deployment.
-- Provide an existing OCI compartment containing the enrolled pools, their immutable instance configurations and workers, plus an existing Function subnet. One controller targets one pool compartment and region. Use a dedicated staging worker compartment where practical.
+- Provide an existing OCI compartment containing the enrolled pools, their immutable instance configurations and workers, plus an existing VCN and Function subnet. One controller targets one pool compartment and region. Use a dedicated staging worker compartment where practical.
 - Provide a private operator-owned OCIR repository and reviewed image digest. The Functions application architecture must match the image (`GENERIC_ARM` / `linux/arm64` by default). Intel **worker** architecture is independent of the Function runtime architecture.
 - The existing Function subnet must have DNS and outbound connectivity to the regional OCI APIs and Object Storage. Its routing, service/NAT gateways, security lists/NSGs and available IPs are the operator's responsibility. This module does not make an invocation endpoint private merely by using a private subnet.
 - Have the tenancy administrator review FaaS image/network access, controller resource-principal permissions, caller permissions, and OCI service limits. Cross-compartment images, volumes, VNICs, subnets, encryption keys or other custom launch dependencies may require additional **reviewed** permissions not inferred by this module.
+- The Resource Manager execution identity needs read access to the pinned existing instance pools and their instance configurations. That read-only plan-time access is what lets this module discover and verify pool names, shapes, OCPUs and memory instead of accepting them as typed input.
 - Store Terraform state and plans in the operator's access-controlled, encrypted backend with locking and backups. No backend is assumed here; the default is local state. Never send populated `.tfvars`, state, plan files or credentials back with the source.
 
 ## 2. Enroll an existing staging pool
@@ -38,12 +40,12 @@ Terraform deliberately leaves enrollment to your platform's existing infrastruct
 
 | Resource | Required contract |
 | --- | --- |
-| Pool | Exact configured `pool_id`, `pool_name`, region and pool compartment; `HarnessId = scope_id` and `ScaleTestProfile = map key`. |
-| Instance configuration | Same compartment and both enrollment tags; its launch details must match the registered Intel shape, OCPUs and memory. |
+| Pool | Enter only the exact `pool_id`; Terraform reads its name and verifies its region/compartment, `HarnessId = scope_id` and `ScaleTestProfile = map key`. |
+| Instance configuration | Terraform reads the attached immutable configuration, verifies its compartment and enrollment tags, and derives its Intel shape, OCPUs and memory. |
 | Launch details | Both enrollment tags and exact free-form `InstanceTerminationProtectionEnabled = "1"` so new workers are protected. |
 | Existing worker | Same compartment, correct membership and enrollment tags; protected unless your platform has irrevocably finished retirement preparation. |
 
-Pool OCIDs are pinned in the Function-owned registry. Client input cannot expand the allowlist. Do not reuse a profile key for a different pool with an existing ledger; migration requires review of historical retirement and request records.
+Pool OCIDs are pinned in the Function-owned registry. The map key, `pool_id`, `worker_type` and approved `max_size` are the only enrollment values entered in the stack form; Terraform derives the remaining profile properties from OCI. Client input cannot expand the allowlist. Do not reuse a profile key for a different pool with an existing ledger; migration requires review of historical retirement and request records.
 
 Instance configurations are immutable: if the existing launch template is missing required tags or shape settings, your platform creates a replacement configuration through its normal infrastructure workflow and associates it with the staging pool. The controller does not modify operator launch templates. Verify new workers inherit tags. Audit free-form tag capacity for the two enrollment tags and protection flag. Do not silently remove unrelated operator tags.
 
@@ -98,10 +100,16 @@ GitHub archive-root directory, so its exact Terraform working directory is
 **`deploy/reference`**. A PAR launch URL must include
 `&workingDirectory=deploy%2Freference`.
 
-Provide an existing private image and matching digest/architecture, along with
-the reviewed infrastructure values. The Resource Manager execution identity
-needs permission to create the defined resources; runtime Function IAM is a
-separate requirement. Do not put signing keys or registry tokens in variables.
+Select the compartments, Function VCN and Function subnet from the form. The
+subnet selector is filtered by the selected network compartment and VCN. Provide
+an existing private image and matching digest/architecture, then, for each pool
+map key, enter only its OCID, worker type and approved maximum size. The
+dedicated Object Storage ledger bucket is created automatically; leave its
+optional name blank unless you need a reviewed fixed name. The Resource Manager
+execution identity needs permission to create the defined resources and read
+the selected subnets plus pinned pools/configurations; runtime Function IAM is
+a separate requirement. Do not put signing keys or registry tokens in
+variables.
 
 Deselect **Run apply**, create the stack, run a **Plan**, and review it before
 applying. A successful plan is not a runtime test. After apply, perform signed

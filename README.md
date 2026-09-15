@@ -136,10 +136,15 @@ python3 scripts/package-reference.py
 The `*-resource-manager.zip` preserves the source layout. Its full Terraform
 working directory is **`deploy/reference`** (without the GitHub archive-root
 prefix). This directory contains the Terraform files and `schema.yaml` that
-render the deployment form. The full source `.tar.gz` is for review, not
-Resource Manager. Follow the [deployment guide](deploy/reference/README.md)
-first: existing pools/networking, a built private Function image and digest,
-IAM permissions, and deployment variables are still required.
+render the deployment form. The form uses OCI selectors for compartments, the
+Function VCN and Function subnets, with subnets filtered to the selected VCN.
+For each pool it asks only for the pool OCID, worker type and approved maximum
+size; Terraform reads the existing pool/configuration to verify tags and derive
+its name, shape, OCPUs and memory. The dedicated Object Storage ledger bucket
+is created automatically. The full source `.tar.gz` is for review, not Resource
+Manager. Follow the [deployment guide](deploy/reference/README.md) first:
+existing pools/networking, a built private Function image and digest, IAM
+permissions, and deployment variables are still required.
 
 To host a version-pinned package privately, use an approved read-only,
 single-object Object Storage pre-authenticated request (PAR) for the deployment
@@ -161,7 +166,8 @@ replace release approval or the staging checks in the runbook.
 
 Profiles use `worker_type` in Terraform and `workerType` in Function profile
 JSON/status output. These are descriptive worker-class labels, not OCI shape
-identifiers; `oci_shape`, OCPU and memory settings remain separately validated.
+identifiers; Terraform derives shape, OCPUs and memory from the attached
+immutable instance configuration and validates them at plan time.
 Invoke the example as `examples/pool_controller.py`. The release archive and
 default deployment prefix are `oci-pool-controller`.
 

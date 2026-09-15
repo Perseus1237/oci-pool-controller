@@ -22,6 +22,16 @@ variable "network_compartment_ocid" {
   type        = string
 }
 
+variable "function_vcn_ocid" {
+  description = "Existing VCN containing the selected Function subnets."
+  type        = string
+
+  validation {
+    condition     = startswith(var.function_vcn_ocid, "ocid1.vcn.")
+    error_message = "function_vcn_ocid must be an OCI VCN OCID."
+  }
+}
+
 variable "registry_compartment_ocid" {
   description = "Compartment containing the operator's existing private OCIR repository."
   type        = string
@@ -84,31 +94,20 @@ variable "function_shape" {
 }
 
 variable "pools" {
-  description = "Pinned existing-pool allowlist; keys must match each pool/configuration/worker ScaleTestProfile tag."
+  description = "Pinned existing-pool allowlist. Terraform reads each pool and immutable launch configuration to derive its name, Intel shape, OCPUs and memory; keys must match each pool/configuration/worker ScaleTestProfile tag."
   type = map(object({
-    pool_id      = string
-    pool_name    = string
-    display_name = optional(string)
-    worker_type  = string
-    oci_shape    = string
-    ocpus        = number
-    memory_gbs   = number
-    max_size     = number
+    pool_id     = string
+    worker_type = string
+    max_size    = number
   }))
 
   validation {
     condition = length(var.pools) > 0 && alltrue([
       for key, pool in var.pools : can(regex("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$", key)) &&
-      startswith(pool.pool_id, "ocid1.instancepool.") && length(pool.pool_name) > 0 &&
-      length(pool.pool_name) <= 255 && length(pool.worker_type) > 0 &&
-      pool.max_size >= 1 && floor(pool.max_size) == pool.max_size &&
-      contains(["VM.Standard3.Flex", "VM.Optimized3.Flex"], pool.oci_shape) &&
-      pool.ocpus >= 1 && pool.ocpus <= (pool.oci_shape == "VM.Optimized3.Flex" ? 18 : 32) &&
-      floor(pool.ocpus) == pool.ocpus && floor(pool.memory_gbs) == pool.memory_gbs &&
-      pool.memory_gbs >= pool.ocpus && pool.memory_gbs <= pool.ocpus * 64 &&
-      pool.memory_gbs <= (pool.oci_shape == "VM.Optimized3.Flex" ? 256 : 512)
+      startswith(pool.pool_id, "ocid1.instancepool.") && length(pool.worker_type) > 0 &&
+      pool.max_size >= 1 && floor(pool.max_size) == pool.max_size
     ])
-    error_message = "Each entry must pin an existing pool, match a supported Intel profile and use a positive integer max_size."
+    error_message = "Each entry must pin an existing pool, include worker_type and use a positive integer max_size."
   }
 
   validation {

@@ -11,9 +11,9 @@
       "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
     },
     {
-      "bytes": 10496,
+      "bytes": 13847,
       "path": "deploy/reference/main.tf",
-      "sha256": "a3f999f7acfdd1d457935911726cee8cf6dcea13afebc82d6cc74fa6eb78fab1"
+      "sha256": "6854a6722396b272b2a15c77ee12797845f5751a473a37b36375772e16eb4030"
     },
     {
       "bytes": 1230,
@@ -21,24 +21,24 @@
       "sha256": "a773af1b6cb5cfb42a7309c858d09d7e50933abe4d00a4474fad3a995858a0b0"
     },
     {
-      "bytes": 16728,
+      "bytes": 17773,
       "path": "deploy/reference/README.md",
-      "sha256": "cf5722f0b59152fc24720f3bad84b8c0dfffdbbe8ff4b67b81bbf45fae234ad8"
+      "sha256": "b4217684ea74cc60d0f0b6b9ec5f9d05f29c0c2a8e7d31aabf6ad878323065d5"
     },
     {
       "path": "deploy/reference/schema.yaml",
-      "bytes": 4906,
-      "sha256": "34ffcc479c6c84caa4fb77960c525c62442fd8964d458c4184e0a4565f5f1411"
+      "bytes": 4910,
+      "sha256": "59e64c2124540e6e2a3ce61249a0582f911a67d2973f8e8178a93870a0cab84a"
     },
     {
-      "bytes": 1570,
+      "bytes": 1452,
       "path": "deploy/reference/terraform.tfvars.example",
-      "sha256": "f565ce5509779dcf761ed089076a812102382193502f377c0fd3407e2874678c"
+      "sha256": "c69a47647862eea97a51a51971d9fcd81e54b0d9bfa8a3bf66f7b80b8bb664c5"
     },
     {
-      "bytes": 7488,
+      "bytes": 7243,
       "path": "deploy/reference/variables.tf",
-      "sha256": "cf861512e28af36b6e2a3474af5d9915b5c34b0f7135f76a37905a12056ed2d1"
+      "sha256": "8eb008ed304b50458d4ae24d096fd0f781df0584bcdaa18b2c9d6d2d25dfc6d3"
     },
     {
       "bytes": 506,
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 12133,
+      "bytes": 12583,
       "path": "README.md",
-      "sha256": "fe00e825de6e7b477d17861adb7a0d12ab0050f6d407522ea6c9cd24b7ccb598"
+      "sha256": "ac8b386c1abbb02d785d8ad45486dbdfc093625d3c0d15eb739b06ce4a581a11"
     },
     {
       "bytes": 2889,
