@@ -19,11 +19,11 @@ complete Terraform working-directory path in that GitHub archive is exactly
 Terraform configuration and `schema.yaml`; it is why Resource Manager renders
 the deployment inputs instead of treating the repository root as a stack.
 
-The form asks for the controller, pool, network, and OCIR compartments;
-existing Function subnet OCIDs; the reviewed private Function image and digest;
-the existing-pool allowlist; safety limits; reviewed IAM options; and the
-optional dedicated Object Storage ledger-bucket name. No tenancy values,
-credentials, image, bucket, pool, or stack are created by opening the button.
+The form asks for the controller, pool, network, and OCIR compartments; the
+Function VCN and subnet; the reviewed private Function image and digest; the
+existing-pool allowlist; safety limits; reviewed IAM options; and the optional
+dedicated Object Storage ledger-bucket name. No tenancy values, credentials,
+image, bucket, pool, or stack are created by opening the button.
 
 ## Sample Code Disclaimer
 
@@ -124,6 +124,34 @@ information** page, explicitly select Terraform **1.5.x** before selecting
 **Next**. The module constrains Terraform to Resource Manager's supported
 1.5.x runtime (CLI 1.5.7); selecting a blank or retired version causes the
 `Invalid Terraform version` error.
+
+### Automated, digest-pinned image package
+
+The public button intentionally leaves the Function image fields blank. For a
+deployment package that pre-fills the exact image and immutable digest, run the
+following from an approved workstation or CI runner after authenticating Podman
+to the operator's private OCIR repository. Use the CI secret store or a local
+credential helper for the login; do not pass an auth token as a command-line
+argument or commit it to this repository.
+
+```sh
+export POOL_IMAGE="iad.ocir.io/OCIR_NAMESPACE/OCIR_REPOSITORY:release-2026-09-15"
+python3 scripts/build-publish-function-image.py --image "$POOL_IMAGE" --output-dir dist
+```
+
+The command builds `function/Dockerfile` for `linux/arm64`, pushes it, captures
+the digest returned by OCIR, and creates a
+`*-resource-manager-<digest-prefix>.zip` plus a non-secret image-values JSON
+sidecar. The ZIP pre-fills the image address, digest, and `GENERIC_ARM` in the
+Resource Manager form, and includes `IMAGE_PROVENANCE.json` for review. It does
+not create a stack, upload an artifact, accept terms, or run Terraform apply.
+Use `--architecture amd64` only when the reviewed image is built for that
+architecture; it pre-fills `GENERIC_X86`.
+
+Host that generated ZIP behind an approved read-only Object Storage PAR and
+open it with `workingDirectory=deploy%2Freference`, as documented below. The
+image fields remain visible in Resource Manager so the operator can confirm the
+release before continuing.
 
 ### Packaged release ZIP
 

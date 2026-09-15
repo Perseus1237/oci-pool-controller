@@ -21,9 +21,9 @@
       "sha256": "a773af1b6cb5cfb42a7309c858d09d7e50933abe4d00a4474fad3a995858a0b0"
     },
     {
-      "bytes": 17773,
+      "bytes": 18136,
       "path": "deploy/reference/README.md",
-      "sha256": "b4217684ea74cc60d0f0b6b9ec5f9d05f29c0c2a8e7d31aabf6ad878323065d5"
+      "sha256": "f5049bf74038b6f0023036bcf9af54a718f6ab7ce2f20f287b726b64a5c88688"
     },
     {
       "path": "deploy/reference/schema.yaml",
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 12583,
+      "bytes": 14056,
       "path": "README.md",
-      "sha256": "ac8b386c1abbb02d785d8ad45486dbdfc093625d3c0d15eb739b06ce4a581a11"
+      "sha256": "9a517b977098f028b660911fe4713b27476d19b2e794dfd3690415f38c3afcc7"
     },
     {
       "bytes": 2889,
@@ -111,9 +111,14 @@
       "sha256": "1f6dda9b67a830011287f2f5bea5ed87404ac6894611e73346fefd27e0ba066d"
     },
     {
+      "path": "scripts/build-publish-function-image.py",
+      "bytes": 3842,
+      "sha256": "b418b76baa2e91cc67802a2a3bdd973d7d9cbaf88a7295b3e98807d58dd6310d"
+    },
+    {
       "path": "scripts/package-reference.py",
-      "bytes": 4330,
-      "sha256": "aaee1a996b9a4edeef29aa71472703e1e067737ff445f19aae305b41f1a02c72"
+      "bytes": 8790,
+      "sha256": "6e31845c11050896206988c937cb27c2a0f3e0d579310b2647ad556f8f56eb0c"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",

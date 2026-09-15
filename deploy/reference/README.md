@@ -53,14 +53,22 @@ The inherited enrollment names `HarnessId` and `ScaleTestProfile` are retained f
 
 ## 3. Build an operator-owned image
 
-From the release root, after security/dependency review:
+From the release root, after security/dependency review and an approved Podman
+login to OCIR, use the digest-pinned package command:
 
 ```sh
-export POOL_IMAGE="iad.ocir.io/OCIR_NAMESPACE/OCIR_REPOSITORY:0.12.0-rc.1"
-podman build --platform linux/arm64 -f function/Dockerfile -t "$POOL_IMAGE" function
+export POOL_IMAGE="iad.ocir.io/OCIR_NAMESPACE/OCIR_REPOSITORY:release-2026-09-15"
+python3 scripts/build-publish-function-image.py --image "$POOL_IMAGE" --output-dir dist
 ```
 
-Authenticate and push using the operator's approved CI/registry-secret workflow; never copy a demo auth token or pass credentials on a command line. Record the pushed immutable `sha256:` digest and set both `function_image` and `function_image_digest`. Use `linux/amd64` and `GENERIC_X86` together if that is the reviewed runtime choice. Building/pushing an image is not performed by this Terraform module.
+The command builds the accompanying Function source, pushes it, captures the
+registry-returned immutable `sha256:` digest, and creates a Resource Manager ZIP
+with the image address, digest and architecture pre-filled for visible review.
+It never accepts OCI terms, uploads the ZIP, creates a stack or applies
+Terraform. Authenticate only through the operator's approved CI secret store or
+credential helper; never copy a demo auth token or pass credentials on a
+command line. Use `--architecture amd64` only with a reviewed `linux/amd64`
+image; it selects `GENERIC_X86`.
 
 ## 4. Review configuration and IAM
 
@@ -93,12 +101,14 @@ bundled. In Resource Manager's **Stack information** page, select Terraform
 1.5.x runtime (CLI 1.5.7) only; selecting a blank or retired version produces
 an `Invalid Terraform version` error.
 
-For a version-pinned package, run `python3 scripts/package-reference.py` from
-the repository root and host the generated `*-resource-manager.zip` in Resource
-Manager or through a reviewed read-only Object Storage PAR. The package has no
-GitHub archive-root directory, so its exact Terraform working directory is
-**`deploy/reference`**. A PAR launch URL must include
-`&workingDirectory=deploy%2Freference`.
+For a version-pinned package with blank image fields, run
+`python3 scripts/package-reference.py` from the repository root. For the
+recommended digest-pinned package, use
+`scripts/build-publish-function-image.py` above and host its generated
+`*-resource-manager-<digest-prefix>.zip` through a reviewed read-only Object
+Storage PAR. The package has no GitHub archive-root directory, so its exact
+Terraform working directory is **`deploy/reference`**. A PAR launch URL must
+include `&workingDirectory=deploy%2Freference`.
 
 Select the compartments, Function VCN and Function subnet from the form. The
 subnet selector is filtered by the selected network compartment and VCN. Provide
