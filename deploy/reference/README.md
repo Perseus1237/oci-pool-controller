@@ -86,7 +86,10 @@ It downloads the GitHub `main.zip`, whose full Terraform working directory is
 **`oci-pool-controller-main/deploy/reference`**. That directory contains the
 included `schema.yaml`, which groups the required compartments, subnet, image,
 pool map, Object Storage ledger, and safety controls. No real tenancy values are
-bundled.
+bundled. In Resource Manager's **Stack information** page, select Terraform
+**1.5.x** before selecting **Next**. The module supports the Resource Manager
+1.5.x runtime (CLI 1.5.7) only; selecting a blank or retired version produces
+an `Invalid Terraform version` error.
 
 For a version-pinned package, run `python3 scripts/package-reference.py` from
 the repository root and host the generated `*-resource-manager.zip` in Resource

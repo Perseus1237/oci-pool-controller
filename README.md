@@ -119,7 +119,11 @@ GitHub puts the source under a top-level
 `oci-pool-controller-main/` directory in `main.zip`. Therefore the direct
 GitHub launch must use the full working directory
 **`oci-pool-controller-main/deploy/reference`**. `schema.yaml` is located at
-that path and renders the Resource Manager variable form.
+that path and renders the Resource Manager variable form. On the **Stack
+information** page, explicitly select Terraform **1.5.x** before selecting
+**Next**. The module constrains Terraform to Resource Manager's supported
+1.5.x runtime (CLI 1.5.7); selecting a blank or retired version causes the
+`Invalid Terraform version` error.
 
 ### Packaged release ZIP
 

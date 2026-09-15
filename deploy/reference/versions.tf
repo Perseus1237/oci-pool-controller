@@ -1,5 +1,7 @@
 terraform {
-  required_version = ">= 1.5.0"
+  # OCI Resource Manager currently runs Terraform 1.5.7. Keep this module in
+  # the supported 1.5.x line rather than accepting an unselectable newer CLI.
+  required_version = ">= 1.5.0, < 1.6.0"
 
   required_providers {
     oci = {
