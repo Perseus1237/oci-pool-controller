@@ -21,9 +21,9 @@
       "sha256": "a773af1b6cb5cfb42a7309c858d09d7e50933abe4d00a4474fad3a995858a0b0"
     },
     {
-      "bytes": 16172,
+      "bytes": 16467,
       "path": "deploy/reference/README.md",
-      "sha256": "36ff4ea71de22b9b96c9efb53d00fd34f3fa3222fb19c8e7de14ee9b8b0a20d5"
+      "sha256": "922138ee6cd43bff9ec3387cdcaa8c1cf6777051f57235173613de9de9ec2004"
     },
     {
       "path": "deploy/reference/schema.yaml",
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 10882,
+      "bytes": 11859,
       "path": "README.md",
-      "sha256": "b7a3589e6f5634df7411a3c5875945fddf226194e69a9af3b54ee27d5d5c4f5c"
+      "sha256": "6bb7dcdddedb24d930518d1fe662b8a2f10f7ea8521a44a6c3a4ef3bb7816126"
     },
     {
       "bytes": 2889,

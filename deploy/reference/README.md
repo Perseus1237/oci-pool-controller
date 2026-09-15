@@ -81,13 +81,19 @@ Permissions are bounded to specified compartments, with Object Storage writes li
 
 ### Resource Manager option
 
-Run `python3 scripts/package-reference.py` from the repository root. Upload the
-generated `*-resource-manager.zip` to Resource Manager, or use a private deploy
-link for the same ZIP. Choose Terraform **1.5.x** and select
-**`deploy/reference`** as the working directory. The included `schema.yaml` in
-that directory groups the required variables, pool map, image configuration and
-safety controls. No real tenancy values are bundled. A one-click private PAR
-link must include `&workingDirectory=deploy%2Freference`.
+For the public one-click launch, use the button in the repository root README.
+It downloads the GitHub `main.zip`, whose full Terraform working directory is
+**`oci-pool-controller-main/deploy/reference`**. That directory contains the
+included `schema.yaml`, which groups the required compartments, subnet, image,
+pool map, Object Storage ledger, and safety controls. No real tenancy values are
+bundled.
+
+For a version-pinned package, run `python3 scripts/package-reference.py` from
+the repository root and host the generated `*-resource-manager.zip` in Resource
+Manager or through a reviewed read-only Object Storage PAR. The package has no
+GitHub archive-root directory, so its exact Terraform working directory is
+**`deploy/reference`**. A PAR launch URL must include
+`&workingDirectory=deploy%2Freference`.
 
 Provide an existing private image and matching digest/architecture, along with
 the reviewed infrastructure values. The Resource Manager execution identity
