@@ -33,7 +33,7 @@ variable "function_vcn_ocid" {
 }
 
 variable "registry_compartment_ocid" {
-  description = "Compartment containing the operator's existing private OCIR repository."
+  description = "Compartment where the stack creates its private OCIR repository, or containing the existing image in manual mode."
   type        = string
 }
 
@@ -67,23 +67,44 @@ variable "scope_id" {
   }
 }
 
-variable "function_image" {
-  description = "Operator-owned private OCIR image including tag, built from the accompanying Function source."
+variable "build_function_image" {
+  description = "Build the included Function source during Apply and create its private OCIR repository automatically. Requires a native x86 Linux Docker host (available in OCI Resource Manager)."
+  type        = bool
+  default     = true
+}
+
+variable "ocir_username" {
+  description = "OCI username, including identity domain where applicable (for example Default/user@example.com). The tenancy namespace is added automatically. Used only for automatic builds."
   type        = string
+  default     = ""
+}
+
+variable "ocir_auth_token" {
+  description = "OCI auth token for the registry user, not the Console password. Used only for automatic builds. Protect stack variables and state; sensitive does not make Terraform 1.5 values ephemeral."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "function_image" {
+  description = "Only when automatic build is disabled: existing same-region OCIR image address including tag, built from the accompanying Function source."
+  type        = string
+  default     = ""
 }
 
 variable "function_image_digest" {
-  description = "Immutable SHA-256 digest of the exact reviewed Function image, not a demo-tenancy image."
+  description = "Optional digest pin for an existing image. Leave blank to let OCI Functions resolve the supplied image tag. Automatic builds resolve the digest without manual input."
   type        = string
+  default     = ""
 
   validation {
-    condition     = can(regex("^sha256:[0-9a-f]{64}$", var.function_image_digest))
-    error_message = "Supply a sha256: digest with 64 lowercase hexadecimal characters."
+    condition     = var.function_image_digest == "" || can(regex("^sha256:[0-9a-f]{64}$", var.function_image_digest))
+    error_message = "Leave blank or supply a sha256: digest with 64 lowercase hexadecimal characters."
   }
 }
 
 variable "function_shape" {
-  description = "Function runtime CPU architecture; must match the image, independent of Intel worker shapes."
+  description = "Existing-image mode only: architecture must match the image. Automatic builds use GENERIC_X86, independent of worker shapes."
   type        = string
   default     = "GENERIC_ARM"
 

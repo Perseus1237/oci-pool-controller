@@ -1,16 +1,17 @@
 schemaVersion: 1.1.0
-version: "20260914"
+version: "20260915"
 title: OCI Pool Controller Reference Implementation
 description: Unsupported reference implementation for existing OCI instance pools.
 informationalText: >-
-  Start with dry-run enabled and termination disabled. This stack does not
-  build the Function image or create worker pools. Deselect Run apply and
-  review a plan first. Release and staging approvals remain required.
+  Apply creates a private OCIR repository, builds the included Function source,
+  and deploys it. No prebuilt image is required. Supply registry authentication
+  below. Existing worker pools and networking are required; this stack does not
+  create or retag them. Start with dry-run enabled and termination disabled.
 variableGroups:
   - title: Existing infrastructure
     variables: [region, tenancy_ocid, controller_compartment_ocid, pool_compartment_ocid, network_compartment_ocid, function_vcn_ocid, registry_compartment_ocid, subnet_ids]
-  - title: Reviewed Function image
-    variables: [function_image, function_image_digest, function_shape]
+  - title: Function deployment
+    variables: [build_function_image, ocir_username, ocir_auth_token, function_image, function_image_digest, function_shape]
   - title: Pool enrollment
     variables: [scope_id, pools]
   - title: Safety and capacity
@@ -47,7 +48,8 @@ variables:
   registry_compartment_ocid:
     type: oci:identity:compartment:id
     required: true
-    title: Private OCIR compartment
+    title: OCIR repository compartment
+    description: A private repository is created here automatically. For an existing image, select its repository compartment.
   subnet_ids:
     type: list
     valueType: subnet_item
@@ -60,18 +62,41 @@ variables:
     dependsOn:
       compartmentId: ${network_compartment_ocid}
       vcnId: ${function_vcn_ocid}
+  build_function_image:
+    type: boolean
+    default: true
+    title: Build and deploy the Function automatically
+    description: Creates a private OCIR repository and builds the included source for x86 during Apply. Disable only to supply an existing image.
+  ocir_username:
+    type: string
+    required: true
+    visible: ${build_function_image}
+    title: OCI registry username
+    description: Include the identity domain where applicable (for example Default/user@example.com). Do not include the tenancy namespace; it is added automatically.
+  ocir_auth_token:
+    type: password
+    required: true
+    visible: ${build_function_image}
+    title: OCI auth token
+    description: Auth token for the registry user, not the Console password. Create under your profile's Tokens and keys. Restrict access to stack variables and state.
   function_image:
     type: string
     required: true
-    title: Private OCIR image address including tag
+    visible:
+      not: ["${build_function_image}"]
+    title: Existing OCIR image address including tag
   function_image_digest:
     type: string
-    required: true
-    title: Reviewed image digest (sha256)
+    required: false
+    visible:
+      not: ["${build_function_image}"]
+    title: Optional image digest pin (sha256)
   function_shape:
     type: enum
     enum: [GENERIC_ARM, GENERIC_X86]
     default: GENERIC_ARM
+    visible:
+      not: ["${build_function_image}"]
     title: Function architecture (must match image)
   scope_id:
     type: string
@@ -151,6 +176,12 @@ variables:
       This stack creates a dedicated private, versioned ledger bucket. Leave
       blank to use the generated name; do not provide an existing shared bucket.
 outputs:
+  function_image:
+    type: string
+    title: Deployed Function image
+  function_image_digest:
+    type: string
+    title: Deployed image digest
   function_ocid:
     type: ocid
     title: Controller Function

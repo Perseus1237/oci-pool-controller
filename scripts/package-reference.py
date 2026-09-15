@@ -67,6 +67,7 @@ def prefilled_resource_manager_files(files, values):
     """Return a Resource Manager-only file set with reviewable image defaults."""
     result = dict(files)
     schema = result[f"{RESOURCE_MANAGER_WORKING_DIRECTORY}/schema.yaml"].decode("utf-8")
+    schema = set_schema_default(schema, "build_function_image", False)
     for variable in IMAGE_DEFAULTS:
         schema = set_schema_default(schema, variable, values[variable])
     schema_path = f"{RESOURCE_MANAGER_WORKING_DIRECTORY}/schema.yaml"

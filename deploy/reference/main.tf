@@ -140,10 +140,14 @@ resource "oci_functions_application" "controller" {
   compartment_id = var.controller_compartment_ocid
   display_name   = "${var.name_prefix}-${local.suffix}"
   subnet_ids     = var.subnet_ids
-  shape          = var.function_shape
+  shape          = local.effective_function_shape
   freeform_tags  = local.tags
 
   lifecycle {
+    precondition {
+      condition     = var.build_function_image || length(trimspace(var.function_image)) > 0
+      error_message = "Enable automatic image building or supply an existing same-region OCIR Function image."
+    }
     precondition {
       condition     = local.function_subnets_valid
       error_message = "Every selected Function subnet must be in the configured network compartment and Function VCN."
@@ -177,8 +181,8 @@ locals {
 resource "oci_functions_function" "controller" {
   application_id     = oci_functions_application.controller.id
   display_name       = "${var.name_prefix}-control"
-  image              = var.function_image
-  image_digest       = var.function_image_digest
+  image              = local.effective_function_image
+  image_digest       = var.build_function_image || var.function_image_digest == "" ? null : var.function_image_digest
   memory_in_mbs      = 256
   timeout_in_seconds = 120
   freeform_tags      = local.tags
@@ -206,7 +210,7 @@ resource "oci_functions_function" "controller" {
     }
   }
 
-  depends_on = [oci_objectstorage_object.budget_lock]
+  depends_on = [oci_objectstorage_object.budget_lock, terraform_data.function_image_build]
 }
 
 resource "oci_identity_dynamic_group" "controller" {

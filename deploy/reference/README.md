@@ -1,6 +1,6 @@
 # Existing-pool reference deployment
 
-This staging module deploys the **0.12.0-rc.1 controller**, not the demo tenancy. It creates one OCI Function/application, a dedicated private versioned Object Storage ledger, the initial aggregate lease object, invocation logging, and optionally narrowly scoped IAM resources. It does **not** create, import, resize or retag any instance pool, worker, instance configuration, network, registry, API Gateway, UI, worker terminator or readiness Function.
+This staging module deploys the **0.12.0-rc.6 controller reference package**, not the demo tenancy. It creates one OCI Function/application, a dedicated private versioned Object Storage ledger, the initial aggregate lease object, invocation logging, and optionally narrowly scoped IAM resources. By default it also creates a private immutable OCIR repository, builds the included Function source, and pushes the image during Apply. It does **not** create, import, resize or retag any instance pool, worker, instance configuration or network, or create an API Gateway, UI, worker terminator or readiness Function.
 
 This is unsupported sample code; see [DISCLAIMER.md](../../DISCLAIMER.md) and
 [NOTICE.md](../../NOTICE.md). `0.12.0-rc.1` introduces
@@ -22,17 +22,19 @@ ownership. Never reset generations or retirement records for a naming change.
 Review the exact Terraform plan and test a compatible upgrade in staging.
 This module is not an automatic migration of existing lab infrastructure.
 
-Build the accompanying Function source using the controller Dockerfile; do not substitute a historical demo image. Deploy and test this candidate in operator staging before promotion. Worker readiness in this package remains a diagnostic bootstrap proxy. Your platform retains its own registration and dispatch readiness authority.
+For an existing deployment, set `build_function_image = false`, retain `function_image` to keep using its existing image/repository path, and set the matching `function_shape`. The new default `build_function_image = true` selects the source-build path and creates a repository; review that change before applying an upgrade.
+
+The default build uses the accompanying controller Dockerfile. Deploy and test this candidate in operator staging before promotion. Worker readiness in this package remains a diagnostic bootstrap proxy. Your platform retains its own registration and dispatch readiness authority.
 
 ## 1. Prerequisites and ownership
 
 - Review the [integration overview](../../README.md), [client example](../../examples/README.md), and [operations runbook](../../docs/RUNBOOK.md) before deployment.
 - Provide an existing OCI compartment containing the enrolled pools, their immutable instance configurations and workers, plus an existing VCN and Function subnet. One controller targets one pool compartment and region. Use a dedicated staging worker compartment where practical.
-- Provide a private operator-owned OCIR repository and reviewed image digest. The Functions application architecture must match the image (`GENERIC_ARM` / `linux/arm64` by default). Intel **worker** architecture is independent of the Function runtime architecture.
+- For the default source build, provide an OCI username and auth token with permission to push images into the selected registry compartment. The stack creates the private OCIR repository and image during Apply; neither must exist before clicking Deploy. The build uses `linux/amd64` and deploys a `GENERIC_X86` Function. For the optional existing-image path, provide the image address and matching architecture; the digest is optional. Intel **worker** architecture is independent of the Function runtime architecture.
 - The existing Function subnet must have DNS and outbound connectivity to the regional OCI APIs and Object Storage. Its routing, service/NAT gateways, security lists/NSGs and available IPs are the operator's responsibility. This module does not make an invocation endpoint private merely by using a private subnet.
 - Have the tenancy administrator review FaaS image/network access, controller resource-principal permissions, caller permissions, and OCI service limits. Cross-compartment images, volumes, VNICs, subnets, encryption keys or other custom launch dependencies may require additional **reviewed** permissions not inferred by this module.
-- The Resource Manager execution identity needs read access to the pinned existing instance pools and their instance configurations. That read-only plan-time access is what lets this module discover and verify pool names, shapes, OCPUs and memory instead of accepting them as typed input.
-- Store Terraform state and plans in the operator's access-controlled, encrypted backend with locking and backups. No backend is assumed here; the default is local state. Never send populated `.tfvars`, state, plan files or credentials back with the source.
+- The Resource Manager execution identity needs permission to create the defined resources, including the private OCIR repository in source-build mode, and read access to the pinned existing instance pools and their instance configurations. That plan-time read access lets this module discover and verify pool names, shapes, OCPUs and memory instead of accepting them as typed input.
+- Protect Resource Manager stack variables, state and saved plans. `ocir_auth_token` is marked sensitive and used only for registry login, but Terraform 1.5 can retain sensitive inputs in state/plans. For local Terraform, configure an access-controlled, encrypted backend with locking and backups; this module does not prescribe one. Never commit tokens, populated `.tfvars`, state or plan files.
 
 ## 2. Enroll an existing staging pool
 
@@ -51,10 +53,47 @@ Instance configurations are immutable: if the existing launch template is missin
 
 The inherited enrollment names `HarnessId` and `ScaleTestProfile` are retained for compatibility; they do not require running the demo. `OriginPoolId`, `DrainOperationId` and `DrainRequestedAt` belong to the legacy contrast flow and are not required by the managed retirement path, which records commitments in the ledger. Exact `"0"` commits irrevocable retirement. Boolean `false`, the string `"false"`, missing or malformed protection tags are not equivalent. There is no controller-enforced post-tag grace interval: your platform must stop scheduling and finish any required drain **before** committing `"0"`.
 
-## 3. Build an operator-owned image
+## 3. Choose the Function image path
 
-From the release root, after security/dependency review and an approved Podman
-login to OCIR, use the digest-pinned package command:
+### Default: build during Resource Manager Apply
+
+Keep `build_function_image = true` (the default). Provide `ocir_username` as your OCI
+domain/username, for example `Default/user`; the stack adds the tenancy's
+Object Storage namespace to form the registry login. Provide
+`ocir_auth_token` from your OCI user profile's **Tokens and keys → Auth Tokens**
+section. This is an OCI auth token, not your account password.
+[Oracle's token instructions](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
+
+During Apply, the stack creates an immutable private OCIR repository in
+`registry_compartment_ocid`, builds the included `function/Dockerfile` for
+`linux/amd64`, pushes the image, and deploys the Function as `GENERIC_X86`.
+The OCI Functions API resolves the image digest automatically. You do not enter
+an image address or digest, and you do not need a pre-existing repository,
+local Podman session, separate generated ZIP, or OCI DevOps pipeline.
+Resource Manager supplies the [Docker build host](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/terraformhost.htm).
+
+The build runs again when the included Function source or build helper changes.
+An unchanged configuration reuses the existing built image. Failed build retries
+receive a new tag; tags cannot overwrite a previous image. The stack-created
+repository has `prevent_destroy` protection so changing image modes cannot
+silently delete the running Function's image. Choose the mode at stack creation;
+later mode changes require a deliberate repository-ownership migration.
+Mutable base-image tags and dependency downloads mean separate source builds
+are not guaranteed to produce identical bytes. Choose an existing pinned image
+when you need to deploy the same previously built artifact.
+
+### Optional: use an existing private OCIR image
+
+Set `build_function_image = false`, then set `function_image` to an operator-owned
+private OCIR image address including its tag. This skips repository creation and the source build, so
+`ocir_username` and `ocir_auth_token` are not needed. Set `function_shape` to
+match the image (`GENERIC_ARM` / `linux/arm64` remains the default in this mode).
+Set `function_image_digest` to pin its reviewed `sha256:` digest, or leave it
+blank for OCI to resolve the tag during deployment. Use an accompanying-source
+image, not a historical demo image.
+
+The optional command below builds and publishes an image from the release root
+on a workstation or CI runner with an authenticated Podman session:
 
 ```sh
 export POOL_IMAGE="iad.ocir.io/OCIR_NAMESPACE/OCIR_REPOSITORY:release-2026-09-15"
@@ -63,7 +102,8 @@ python3 scripts/build-publish-function-image.py --image "$POOL_IMAGE" --output-d
 
 The command builds the accompanying Function source, pushes it, captures the
 registry-returned immutable `sha256:` digest, and creates a Resource Manager ZIP
-with the image address, digest and architecture pre-filled for visible review.
+with `build_function_image = false` and the image address, digest and architecture
+pre-filled for visible review.
 It never accepts OCI terms, uploads the ZIP, creates a stack or applies
 Terraform. Authenticate only through the operator's approved CI secret store or
 credential helper; never copy a demo auth token or pass credentials on a
@@ -72,7 +112,7 @@ image; it selects `GENERIC_X86`.
 
 ## 4. Review configuration and IAM
 
-Copy `terraform.tfvars.example` to local `terraform.tfvars` and replace every placeholder. Keep `dry_run = true` and `enable_termination = false` initially. Choose operator-owned pool/profile and aggregate OCPU ceilings from staging budget and service-limit review; raising ceilings does not demonstrate that the controller can sustain that fleet size. Capacity guards remain enabled and include retiring capacity.
+In Resource Manager, configure the stack form. For local Terraform, copy `terraform.tfvars.example` to local `terraform.tfvars` and replace every placeholder; provide the registry token through a protected input, not a committed file. Keep `dry_run = true` and `enable_termination = false` initially. Choose operator-owned pool/profile and aggregate OCPU ceilings from staging budget and service-limit review; raising ceilings does not demonstrate that the controller can sustain that fleet size. Capacity guards remain enabled and include retiring capacity.
 
 The pool registry is currently inline Function configuration. [OCI limits combined Function/application configuration to 4 KB](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionspassingconfigparams-about.htm); this module conservatively rejects serialized configuration at approximately 4,000 bytes, including UTF-8 metadata. Raising `max_profiles` cannot override that service limit. Long pool identifiers/names reduce how many profiles fit. An external registry is not implemented. Separately reviewed, non-overlapping controller shards are an option, but each needs its own scope, ledger and budget allocation—there is no cross-controller aggregate guard. Do not add unreviewed application-level configuration outside Terraform.
 
@@ -94,32 +134,34 @@ Permissions are bounded to specified compartments, with Object Storage writes li
 For the public one-click launch, use the button in the repository root README.
 It downloads the GitHub `main.zip`, whose full Terraform working directory is
 **`oci-pool-controller-main/deploy/reference`**. That directory contains the
-included `schema.yaml`, which groups the required compartments, subnet, image,
-pool map, Object Storage ledger, and safety controls. No real tenancy values are
+included `schema.yaml`, which groups the required compartments, subnet, registry
+build credentials, optional existing image, pool map, Object Storage ledger,
+and safety controls. No real tenancy values are
 bundled. In Resource Manager's **Stack information** page, select Terraform
 **1.5.x** before selecting **Next**. The module supports the Resource Manager
 1.5.x runtime (CLI 1.5.7) only; selecting a blank or retired version produces
 an `Invalid Terraform version` error.
 
-For a version-pinned package with blank image fields, run
+For a version-pinned package using the same default source build, run
 `python3 scripts/package-reference.py` from the repository root. For the
-recommended digest-pinned package, use
-`scripts/build-publish-function-image.py` above and host its generated
-`*-resource-manager-<digest-prefix>.zip` through a reviewed read-only Object
-Storage PAR. The package has no GitHub archive-root directory, so its exact
+optional package prefilled with an existing image and digest, use
+`scripts/build-publish-function-image.py` above. Host the generated Resource
+Manager ZIP through a read-only Object Storage PAR. The package has no GitHub
+archive-root directory, so its exact
 Terraform working directory is **`deploy/reference`**. A PAR launch URL must
 include `&workingDirectory=deploy%2Freference`.
 
 Select the compartments, Function VCN and Function subnet from the form. The
 subnet selector is filtered by the selected network compartment and VCN. Provide
-an existing private image and matching digest/architecture, then, for each pool
-map key, enter only its OCID, worker type and approved maximum size. The
+the OCIR username/auth token for the default build, or use the optional existing
+image inputs. For each pool map key, enter only its OCID, worker type and
+approved maximum size. The
 dedicated Object Storage ledger bucket is created automatically; leave its
 optional name blank unless you need a reviewed fixed name. The Resource Manager
 execution identity needs permission to create the defined resources and read
 the selected subnets plus pinned pools/configurations; runtime Function IAM is
-a separate requirement. Do not put signing keys or registry tokens in
-variables.
+a separate requirement. Enter a registry token only in the sensitive
+`ocir_auth_token` input; restrict access to stack variables, state and plans.
 
 Deselect **Run apply**, create the stack, run a **Plan**, and review it before
 applying. A successful plan is not a runtime test. After apply, perform signed
@@ -130,7 +172,7 @@ stack.
 
 ### Local Terraform option
 
-From `deploy/reference`, after configuring the approved Terraform backend and OCI deployer credentials:
+From `deploy/reference`, after configuring the approved Terraform backend and OCI deployer credentials. Source-build mode also requires a working Docker daemon on this local host and the OCIR build credentials; the existing-image path does not require Docker:
 
 ```sh
 terraform init
@@ -144,7 +186,7 @@ terraform output invoke_endpoint
 terraform output -json iam_review
 ```
 
-Review the saved plan: only the Function/application, dedicated ledger/lease, logs and explicitly enabled IAM should be created. There must be **no** worker/pool/network mutation. Protect and dispose of saved plans according to operator policy.
+Review the saved plan: only the Function/application, dedicated ledger/lease, logs, source-build repository/build action when selected, and explicitly enabled IAM should be created. There must be **no** worker/pool/network mutation. Protect and dispose of saved plans according to operator policy.
 
 Use the accompanying integration client with the Function OCID and OCI signer. This deployment sets `CONTROLLER_ONLY=true` and `AUTH_MODE=oci_iam`: the OCI InvokeFunction front door verifies the signed caller before dispatch. The application does not trust a caller-supplied `Authorization` header as evidence of OCI identity and requires no shared demo bearer token. A signed direct invocation returns a JSON `{status_code, body}` envelope over successful Function transport; inspect the **business** `status_code`, `body.retryable`, and outcome, not just transport HTTP 200.
 

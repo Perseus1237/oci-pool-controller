@@ -12,7 +12,8 @@ terraform {
 }
 
 # Authentication comes from the operator's OCI profile or workload identity.
-# Never put API private keys or registry passwords in Terraform variables.
+# Never put OCI API private keys in Terraform variables. The optional registry
+# auth token is a sensitive stack input, passed only to the image-build helper.
 provider "oci" {
   region = var.region
 }

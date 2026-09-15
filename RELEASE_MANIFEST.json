@@ -11,39 +11,39 @@
       "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
     },
     {
-      "bytes": 13847,
+      "bytes": 14205,
       "path": "deploy/reference/main.tf",
-      "sha256": "6854a6722396b272b2a15c77ee12797845f5751a473a37b36375772e16eb4030"
+      "sha256": "1eefc61618f2fa333187d288748d6fdfb5bde390862861fc0fd1eeb322e2e980"
     },
     {
-      "bytes": 1230,
+      "bytes": 1598,
       "path": "deploy/reference/outputs.tf",
-      "sha256": "a773af1b6cb5cfb42a7309c858d09d7e50933abe4d00a4474fad3a995858a0b0"
+      "sha256": "0594824165ee4483b7da55a67ed1560d7e0bfd82e526fa72e8d3dac4da9d1c04"
     },
     {
-      "bytes": 18136,
+      "bytes": 22005,
       "path": "deploy/reference/README.md",
-      "sha256": "f5049bf74038b6f0023036bcf9af54a718f6ab7ce2f20f287b726b64a5c88688"
+      "sha256": "a5be49da1d54fa5a04841af3da8d8e808ff67950d79b0800cf734a29a62492a9"
     },
     {
       "path": "deploy/reference/schema.yaml",
-      "bytes": 4910,
-      "sha256": "59e64c2124540e6e2a3ce61249a0582f911a67d2973f8e8178a93870a0cab84a"
+      "bytes": 6334,
+      "sha256": "22220dead3370717848fc50f405e85467c643129f3fc22cbc80a4a6efe8c45cc"
     },
     {
-      "bytes": 1452,
+      "bytes": 1819,
       "path": "deploy/reference/terraform.tfvars.example",
-      "sha256": "c69a47647862eea97a51a51971d9fcd81e54b0d9bfa8a3bf66f7b80b8bb664c5"
+      "sha256": "1c71724c0b340f76cceab28560cea8496f8b069c35be99e0b2d35e10c334e4e3"
     },
     {
-      "bytes": 7243,
+      "bytes": 8368,
       "path": "deploy/reference/variables.tf",
-      "sha256": "8eb008ed304b50458d4ae24d096fd0f781df0584bcdaa18b2c9d6d2d25dfc6d3"
+      "sha256": "f9ff08f6764fe1051a7c3b05aaa497176e58c68bb8e7201dcad0f19c280dc5c1"
     },
     {
-      "bytes": 506,
+      "bytes": 590,
       "path": "deploy/reference/versions.tf",
-      "sha256": "c6277808cc612a602707289bf085d7129adf9412d59d5565853b5f2821edc28e"
+      "sha256": "61bddb1dd6d847e2456c9542435e8821284e3e9ada2f4396468e26d0c36a912e"
     },
     {
       "bytes": 2225,
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 14056,
+      "bytes": 17090,
       "path": "README.md",
-      "sha256": "9a517b977098f028b660911fe4713b27476d19b2e794dfd3690415f38c3afcc7"
+      "sha256": "57b5402243a52c9de6e542e62889eee1013eae65910849c1f76cbfe073a26734"
     },
     {
       "bytes": 2889,
@@ -117,8 +117,28 @@
     },
     {
       "path": "scripts/package-reference.py",
-      "bytes": 8790,
-      "sha256": "6e31845c11050896206988c937cb27c2a0f3e0d579310b2647ad556f8f56eb0c"
+      "bytes": 8861,
+      "sha256": "8e67edfc2fa294f89e12c13a2d3ef732373e8f2b58ea6e9d735d907754d2df97"
+    },
+    {
+      "path": "deploy/reference/image.tf",
+      "bytes": 2821,
+      "sha256": "d6e06ac0fe7d9d45e8cb5bdb78173b2ae82e503530ffcad1d77b6170867f4b63"
+    },
+    {
+      "path": "deploy/reference/build_function_image.py",
+      "bytes": 6608,
+      "sha256": "6912b096d3f6997c586c4c2b15dc076f19835e6caa91cbcfec7b4ed1a1f93540"
+    },
+    {
+      "path": "tests/test_resource_manager_image_build.py",
+      "bytes": 7919,
+      "sha256": "559d4df035b0f116667d7d7eeb7ba150788e900996bd575d56fd607f5a21f919"
+    },
+    {
+      "path": "tests/test_resource_manager_deployment.py",
+      "bytes": 6467,
+      "sha256": "9aa2c294d3642f40151170bc9a7dbedbaa3070199c5c05537bb16c793045982e"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",

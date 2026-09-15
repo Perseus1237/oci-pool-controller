@@ -9,9 +9,15 @@ function_vcn_ocid            = "ocid1.vcn.oc1.iad.REPLACE_FUNCTION_VCN"
 registry_compartment_ocid    = "ocid1.compartment.oc1..REPLACE_REGISTRY"
 subnet_ids                  = ["ocid1.subnet.oc1.iad.REPLACE_FUNCTION_SUBNET"]
 scope_id                    = "pool-controller-staging-01"
-function_image              = "iad.ocir.io/REPLACE_NAMESPACE/REPLACE_REPOSITORY:REVIEWED_VERSION"
-function_image_digest       = "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
-function_shape              = "GENERIC_ARM"
+build_function_image        = true
+ocir_username               = "Default/REPLACE_USERNAME"
+# Set sensitive ocir_auth_token in Resource Manager, or TF_VAR_ocir_auth_token
+# for a local Terraform apply. Never commit tokens. No existing image required.
+# To use a prebuilt image instead, disable the build and set:
+# build_function_image  = false
+# function_image        = "iad.ocir.io/REPLACE_NAMESPACE/REPLACE_REPOSITORY:VERSION"
+# function_image_digest = "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS" # optional
+# function_shape        = "GENERIC_ARM" # must match the existing image
 
 dry_run               = true
 enable_termination    = false

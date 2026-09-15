@@ -20,10 +20,12 @@ Terraform configuration and `schema.yaml`; it is why Resource Manager renders
 the deployment inputs instead of treating the repository root as a stack.
 
 The form asks for the controller, pool, network, and OCIR compartments; the
-Function VCN and subnet; the reviewed private Function image and digest; the
-existing-pool allowlist; safety limits; reviewed IAM options; and the optional
-dedicated Object Storage ledger-bucket name. No tenancy values, credentials,
-image, bucket, pool, or stack are created by opening the button.
+Function VCN and subnet; an OCIR username and auth token; the existing-pool
+allowlist; safety limits; IAM options; and the optional dedicated Object Storage
+ledger-bucket name. During **Apply**, the stack creates a private OCIR repository,
+builds the included Function source, pushes its image, and deploys the Function.
+You do not need to build an image or create a repository before clicking the
+button. Opening the button only opens the form; it does not deploy resources.
 
 ## Sample Code Disclaimer
 
@@ -44,7 +46,7 @@ the pool's existing capacity writer with OCI IAM-signed direct Function calls
 from your control plane, hosted in OCI, another cloud or your own environment.
 Run a durable retry/maintenance loop at your chosen interval. The deployment
 stack references existing pools and networking and creates the controller,
-ledger/logging and optionally reviewed IAM.
+private image repository, ledger/logging and optionally reviewed IAM.
 
 Read these guides in order:
 
@@ -94,9 +96,10 @@ configuration, even a disabled one.
 - Terraform referencing existing operator pools and networking; no demo fleet.
 - Signed OCI invocation client with an illustrative durable local outbox.
 - Architecture, implementation notes, operations and staging acceptance guides.
+- Deployment helper and packaging regression tests (`python3 -m unittest discover -s tests -v`).
 - `RELEASE_MANIFEST.json` with the SHA-256 of every included content file.
 
-Tests, lab assets and historical evidence are not included
+Historical controller tests, lab assets and historical evidence are not included
 in this public-source snapshot. The controller Dockerfile copies only Function source and
 requirements. Terraform state, plans, populated variables, credentials, outboxes
 and local attachments are not packaged.
@@ -125,14 +128,54 @@ information** page, explicitly select Terraform **1.5.x** before selecting
 1.5.x runtime (CLI 1.5.7); selecting a blank or retired version causes the
 `Invalid Terraform version` error.
 
-### Automated, digest-pinned image package
+### Build and deploy the Function in Resource Manager
 
-The public button intentionally leaves the Function image fields blank. For a
-deployment package that pre-fills the exact image and immutable digest, run the
-following from an approved workstation or CI runner after authenticating Podman
-to the operator's private OCIR repository. Use the CI secret store or a local
-credential helper for the login; do not pass an auth token as a command-line
-argument or commit it to this repository.
+Keep `build_function_image = true` (the default) to build from source.
+The stack creates an immutable private repository in the selected OCIR
+compartment, builds `function/Dockerfile` for `linux/amd64` on the Resource Manager
+host, pushes the image, and deploys a `GENERIC_X86` Function. OCI resolves the
+image's SHA-256 digest during Function creation. The image address and digest
+are deployment outputs, not values you need to look up. The Function's
+architecture is independent of the enrolled workers' architecture.
+
+Select the compartments and existing Function VCN/subnets, then enter your
+**OCIR username** (for example, `Default/user`; the stack adds the tenancy
+namespace) and **OCIR auth token**. Generate a token from your OCI user profile
+under **Tokens and keys → Auth Tokens** if you do not already have one. The
+token's user needs permission to push images into the selected registry
+compartment. [Oracle auth-token instructions](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
+
+Docker is included on the [Resource Manager Terraform host](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/terraformhost.htm).
+No local Docker/Podman installation, separate build pipeline, or generated ZIP is
+needed for this path. Apply rebuilds when the included Function source or build
+helper changes. Base-image tags and downloaded dependencies can change between
+builds; use the existing-image option below when deploying a previously built
+artifact is required.
+
+The auth token is a sensitive stack input used for registry login. Terraform
+1.5 can retain sensitive inputs in state and saved plans; protect Resource
+Manager stack access and never commit the token, populated variables, or state.
+IAM creation defaults to off: the required FaaS policies must already exist, or
+an authorized administrator can enable `create_iam_resources`. See the
+[deployment prerequisites](deploy/reference/README.md#1-prerequisites-and-ownership).
+
+### Optional: deploy an existing image
+
+Set `build_function_image = false`, then set `function_image` to an existing
+private OCIR image with a tag to skip the stack's image build and repository creation. Set
+`function_shape` to match that image (`GENERIC_ARM` remains the default for this
+mode). Supply `function_image_digest` to pin a previously reviewed artifact, or
+leave it blank for OCI to resolve the tag during deployment. Registry build
+credentials are not required in this mode.
+
+Choose the image mode when creating the stack. The automatically created
+repository is protected against destruction: switching an existing source-build
+stack to manual mode requires a deliberate repository-ownership migration, not
+just unchecking the box. Leaving source-build mode enabled does not rebuild an
+unchanged image on every Apply.
+
+For a package prefilled with an existing image and digest, the optional helper
+below builds and publishes from an authenticated workstation or CI runner:
 
 ```sh
 export POOL_IMAGE="iad.ocir.io/OCIR_NAMESPACE/OCIR_REPOSITORY:release-2026-09-15"
@@ -142,16 +185,17 @@ python3 scripts/build-publish-function-image.py --image "$POOL_IMAGE" --output-d
 The command builds `function/Dockerfile` for `linux/arm64`, pushes it, captures
 the digest returned by OCIR, and creates a
 `*-resource-manager-<digest-prefix>.zip` plus a non-secret image-values JSON
-sidecar. The ZIP pre-fills the image address, digest, and `GENERIC_ARM` in the
-Resource Manager form, and includes `IMAGE_PROVENANCE.json` for review. It does
+sidecar. The ZIP sets `build_function_image = false`, pre-fills the image address,
+digest, and `GENERIC_ARM` in the Resource Manager form, and includes
+`IMAGE_PROVENANCE.json` for review. It does
 not create a stack, upload an artifact, accept terms, or run Terraform apply.
 Use `--architecture amd64` only when the reviewed image is built for that
 architecture; it pre-fills `GENERIC_X86`.
 
 Host that generated ZIP behind an approved read-only Object Storage PAR and
 open it with `workingDirectory=deploy%2Freference`, as documented below. The
-image fields remain visible in Resource Manager so the operator can confirm the
-release before continuing.
+image fields identify the artifact to deploy. This optional package is not
+needed for the public button's default source build.
 
 ### Packaged release ZIP
 
@@ -171,8 +215,9 @@ size; Terraform reads the existing pool/configuration to verify tags and derive
 its name, shape, OCPUs and memory. The dedicated Object Storage ledger bucket
 is created automatically. The full source `.tar.gz` is for review, not Resource
 Manager. Follow the [deployment guide](deploy/reference/README.md) first:
-existing pools/networking, a built private Function image and digest, IAM
-permissions, and deployment variables are still required.
+existing pools/networking, an OCIR username/auth token for the default build,
+IAM permissions, and deployment variables are still required. The generic
+package supports the same source-build path as the public GitHub button.
 
 To host a version-pinned package privately, use an approved read-only,
 single-object Object Storage pre-authenticated request (PAR) for the deployment

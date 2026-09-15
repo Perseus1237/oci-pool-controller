@@ -2,6 +2,16 @@ output "function_ocid" {
   value = oci_functions_function.controller.id
 }
 
+output "function_image" {
+  description = "Deployed OCIR image address; automatically generated in source-build mode."
+  value       = oci_functions_function.controller.image
+}
+
+output "function_image_digest" {
+  description = "Immutable image digest resolved by OCI Functions for the deployed image."
+  value       = oci_functions_function.controller.image_digest
+}
+
 output "invoke_endpoint" {
   description = "OCI-signed Functions endpoint, not a public unauthenticated application URL."
   value       = oci_functions_function.controller.invoke_endpoint
