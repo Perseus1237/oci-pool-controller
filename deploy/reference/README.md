@@ -8,12 +8,15 @@ generic naming and `workerType` metadata while retaining scaling/retirement safe
 
 ### Existing deployment migration
 
-Pool enrollment now asks only for a pinned `pool_id`, `worker_type` and
-`max_size`. During plan, Terraform reads the pool and its immutable instance
-configuration to derive the real pool name, Intel shape, OCPUs and memory, then
-checks the compartment and enrollment/protection tags. `worker_type` is still
-serialized as `workerType` in `SCALE_TEST_PROFILES_JSON` and returned by pool
-status. Scale requests and retirement actions retain their existing fields.
+New stacks discover enrolled pools during Plan by default. Existing nonempty
+`pools` maps continue to take precedence over `auto_discover_pools`, preserving
+an older stack's explicit allowlist even though the new discovery default is
+`true`. Retain that map when upgrading; switching to discovery is an intentional
+configuration change. Terraform reads each selected pool and its immutable
+instance configuration to derive its real name, Intel shape, OCPUs and memory,
+then checks the compartment and enrollment/protection tags. `worker_type` is
+still serialized as `workerType` in `SCALE_TEST_PROFILES_JSON` and returned by
+pool status. Scale requests and retirement actions retain their existing fields.
 
 The default `name_prefix` is now `oci-pool-controller`. For an existing
 deployment, explicitly retain its current prefix, `scope_id`, pool keys/OCIDs
@@ -33,21 +36,70 @@ The default build uses the accompanying controller Dockerfile. Deploy and test t
 - For the default source build, provide an OCI username and auth token with permission to push images into the selected registry compartment. The stack creates the private OCIR repository and image during Apply; neither must exist before clicking Deploy. The build uses `linux/amd64` and deploys a `GENERIC_X86` Function. For the optional existing-image path, provide the image address and matching architecture; the digest is optional. Intel **worker** architecture is independent of the Function runtime architecture.
 - The existing Function subnet must have DNS and outbound connectivity to the regional OCI APIs and Object Storage. Its routing, service/NAT gateways, security lists/NSGs and available IPs are the operator's responsibility. This module does not make an invocation endpoint private merely by using a private subnet.
 - Have the tenancy administrator review FaaS image/network access, controller resource-principal permissions, caller permissions, and OCI service limits. Cross-compartment images, volumes, VNICs, subnets, encryption keys or other custom launch dependencies may require additional **reviewed** permissions not inferred by this module.
-- The Resource Manager execution identity needs permission to create the defined resources, including the private OCIR repository in source-build mode, and read access to the pinned existing instance pools and their instance configurations. That plan-time read access lets this module discover and verify pool names, shapes, OCPUs and memory instead of accepting them as typed input.
+- The Resource Manager execution identity needs permission to create the defined resources, including the private OCIR repository in source-build mode, and to list/read pools in the selected pool compartment and read their instance configurations. That plan-time read access lets this module discover enrolled pools and verify their names, shapes, OCPUs and memory instead of accepting them as typed input.
 - Protect Resource Manager stack variables, state and saved plans. `ocir_auth_token` is marked sensitive and used only for registry login, but Terraform 1.5 can retain sensitive inputs in state/plans. For local Terraform, configure an access-controlled, encrypted backend with locking and backups; this module does not prescribe one. Never commit tokens, populated `.tfvars`, state or plan files.
 
-## 2. Enroll an existing staging pool
+## 2. Discover already-enrolled pools
 
-Terraform deliberately leaves enrollment to your platform's existing infrastructure owner. For every `pools` entry, review all of the following before sending a mutation:
+Keep `auto_discover_pools = true` and leave the advanced `pools` map empty for the
+default path. During **Plan**, Terraform lists only the selected
+`pool_compartment_ocid` and discovers nonterminal pools in the selected existing
+`HarnessId` group. If exactly one nonempty group is present, `scope_id` can stay
+blank and Terraform infers it. If several groups are present, enter the group's
+existing `HarnessId` value in `scope_id`; this optional input is not a live OCI
+selector. A compartment with no enrolled group needs enrollment preparation by
+its pool owner before discovery can succeed.
+
+Each pool's `ScaleTestProfile` tag becomes its profile key and default
+`worker_type`. `default_pool_max_size` sets each pool's capacity ceiling and
+defaults to **3**; it is not inferred from current pool size and is not a desired
+size request. Optional `pool_overrides`, keyed by `ScaleTestProfile`, can set a
+different `max_size` or `worker_type` for individual profiles. For example:
+
+```hcl
+auto_discover_pools   = true
+scope_id             = "" # Infer the sole existing HarnessId group.
+default_pool_max_size = 3
+pool_overrides = {
+  small = { max_size = 5, worker_type = "small-worker" }
+}
+```
+
+The Plan fails when the group is ambiguous, selected profiles are missing,
+invalid or duplicated, or the existing configurations fail the enrollment,
+shape or protection checks. Terraform does not fix these conditions by retagging
+or changing pools. The infrastructure owner prepares the existing enrollment
+contract below before deployment:
 
 | Resource | Required contract |
 | --- | --- |
-| Pool | Enter only the exact `pool_id`; Terraform reads its name and verifies its region/compartment, `HarnessId = scope_id` and `ScaleTestProfile = map key`. |
+| Pool | Existing `HarnessId` identifies the group; unique `ScaleTestProfile` identifies its profile. Terraform pins the discovered pool OCID and verifies the region/compartment and tags. |
 | Instance configuration | Terraform reads the attached immutable configuration, verifies its compartment and enrollment tags, and derives its Intel shape, OCPUs and memory. |
 | Launch details | Both enrollment tags and exact free-form `InstanceTerminationProtectionEnabled = "1"` so new workers are protected. |
 | Existing worker | Same compartment, correct membership and enrollment tags; protected unless your platform has irrevocably finished retirement preparation. |
 
-Pool OCIDs are pinned in the Function-owned registry. The map key, `pool_id`, `worker_type` and approved `max_size` are the only enrollment values entered in the stack form; Terraform derives the remaining profile properties from OCI. Client input cannot expand the allowlist. Do not reuse a profile key for a different pool with an existing ledger; migration requires review of historical retirement and request records.
+The Plan's `enrollment_review` and `pool_registry` outputs show the exact pool
+OCIDs and limits that will be pinned in the Function-owned registry. Review every
+Plan: subsequent Plans may discover new profiles, but the running Function does
+not discover pools or expand its allowlist. Client input cannot expand it either.
+Preserve the existing group's tags and scope when upgrading: `scope_id` also
+contributes to resource/ledger naming and ownership.
+
+After the first Apply, Terraform retains the chosen group and each profile's
+pool OCID using Terraform-state identity guards. A changed group or a replacement
+pool under an existing profile fails the Plan. Profile guards also have
+`prevent_destroy`: removal from discovery (including tag loss or pool deletion)
+cannot silently discard an existing enrollment. Intentional retirement/removal
+requires a deliberate enrollment/ledger migration and review of historical
+retirement and request records. Do not remove identity guards merely to suppress
+an error or reuse a profile's ledger history for a different pool.
+
+For explicit manual enrollment on a new stack, set `auto_discover_pools = false`
+and use the advanced `pools` map with the profile key, exact `pool_id`,
+`worker_type` and approved `max_size`; set `scope_id` to the existing group.
+A nonempty legacy `pools` map always takes precedence over discovery, including
+on upgraded stacks that have not set the new boolean. Manual enrollment still
+uses the same plan-time pool/configuration checks.
 
 Instance configurations are immutable: if the existing launch template is missing required tags or shape settings, your platform creates a replacement configuration through its normal infrastructure workflow and associates it with the staging pool. The controller does not modify operator launch templates. Verify new workers inherit tags. Audit free-form tag capacity for the two enrollment tags and protection flag. Do not silently remove unrelated operator tags.
 
@@ -135,7 +187,7 @@ For the public one-click launch, use the button in the repository root README.
 It downloads the GitHub `main.zip`, whose full Terraform working directory is
 **`oci-pool-controller-main/deploy/reference`**. That directory contains the
 included `schema.yaml`, which groups the required compartments, subnet, registry
-build credentials, optional existing image, pool map, Object Storage ledger,
+build credentials, optional existing image, pool discovery, Object Storage ledger,
 and safety controls. No real tenancy values are
 bundled. In Resource Manager's **Stack information** page, select Terraform
 **1.5.x** before selecting **Next**. The module supports the Resource Manager
@@ -154,8 +206,11 @@ include `&workingDirectory=deploy%2Freference`.
 Select the compartments, Function VCN and Function subnet from the form. The
 subnet selector is filtered by the selected network compartment and VCN. Provide
 the OCIR username/auth token for the default build, or use the optional existing
-image inputs. For each pool map key, enter only its OCID, worker type and
-approved maximum size. The
+image inputs. Leave pool discovery enabled, choose the default per-pool maximum,
+and enter `scope_id` only if the selected pool compartment has multiple enrolled
+groups. Use optional profile overrides for individual maxima or worker labels;
+the advanced manual map remains available. Review the exact discovered pool IDs
+in the Plan. The
 dedicated Object Storage ledger bucket is created automatically; leave its
 optional name blank unless you need a reviewed fixed name. The Resource Manager
 execution identity needs permission to create the defined resources and read

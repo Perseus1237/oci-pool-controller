@@ -9,6 +9,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 import unittest
 
 
@@ -38,6 +39,18 @@ def default_value(schema, name):
     if len(defaults) != 1:
         raise AssertionError("Expected exactly one default for {}".format(name))
     return json.loads(defaults[0])
+
+
+def group_lines(schema, title):
+    groups = schema.split("\nvariableGroups:\n", 1)[1].split("\nvariables:", 1)[0]
+    lines = groups.splitlines()
+    start = lines.index("  - title: {}".format(title)) + 1
+    result = []
+    for line in lines[start:]:
+        if line.startswith("  - title:"):
+            break
+        result.append(line)
+    return result
 
 
 class ResourceManagerDeploymentTests(unittest.TestCase):
@@ -90,6 +103,54 @@ outputs:
         for name in ("ocir_username", "ocir_auth_token"):
             self.assertIn("    visible: ${build_function_image}", variable_lines(schema, name))
         self.assertIn("    type: password", variable_lines(schema, "ocir_auth_token"))
+
+    def test_normal_pool_enrollment_defaults_to_discovery_without_a_required_map(self):
+        schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
+        self.assertEqual(group_lines(schema, "Pool enrollment"), [
+            "    variables: [auto_discover_pools, default_pool_max_size, scope_id]",
+        ])
+        self.assertIs(default_value(schema, "auto_discover_pools"), True)
+        self.assertEqual(default_value(schema, "default_pool_max_size"), 3)
+        self.assertIn("    visible: ${auto_discover_pools}", variable_lines(schema, "default_pool_max_size"))
+        self.assertEqual(default_value(schema, "scope_id"), "")
+        self.assertIn("    required: false", variable_lines(schema, "scope_id"))
+
+    def test_advanced_pool_groups_follow_mode_and_overrides_start_empty(self):
+        schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
+        manual = group_lines(schema, "Advanced manual enrollment")
+        self.assertIn("    visible:", manual)
+        self.assertIn('      not: ["${auto_discover_pools}"]', manual)
+        self.assertIn("    variables: [pools]", manual)
+        self.assertIn("    required: true", variable_lines(schema, "pools"))
+        overrides = group_lines(schema, "Advanced discovery overrides")
+        self.assertIn("    visible: ${auto_discover_pools}", overrides)
+        self.assertIn("    variables: [pool_overrides]", overrides)
+        self.assertEqual(default_value(schema, "pool_overrides"), {})
+        self.assertIn("    required: false", variable_lines(schema, "pool_overrides"))
+
+    def test_form_variables_match_terraform_and_override_attributes_remain_optional(self):
+        schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
+        terraform = (ROOT / "deploy/reference/variables.tf").read_text(encoding="utf-8")
+        declared = set(re.findall(r'^variable "([A-Za-z0-9_]+)"', terraform, re.MULTILINE))
+        groups = schema.split("\nvariableGroups:\n", 1)[1].split("\nvariables:", 1)[0]
+        for line in groups.splitlines():
+            if line.startswith("    variables: ["):
+                for name in line.split("[", 1)[1].rstrip("]").split(", "):
+                    self.assertIn(name, declared)
+                    self.assertTrue(variable_lines(schema, name))
+        self.assertIn("    valueType: pool_override_entry", variable_lines(schema, "pool_overrides"))
+        self.assertIn("    attributes: [pool_override_worker_type, pool_override_max_size]",
+                      variable_lines(schema, "pool_override_entry"))
+        for schema_name, actual_name, field_type in (
+            ("pool_override_worker_type", "worker_type", "string"),
+            ("pool_override_max_size", "max_size", "number"),
+        ):
+            lines = variable_lines(schema, schema_name)
+            self.assertIn("    actualName: " + actual_name, lines)
+            self.assertIn("    type: " + field_type, lines)
+            self.assertIn("    required: false", lines)
+            self.assertIn("    visible: false", lines)
+            self.assertRegex(terraform, actual_name + r"\s*=\s*optional\(" + field_type + r"\)")
 
     def test_prefilled_package_selects_existing_image_and_preserves_immutable_pin(self):
         result = package.prefilled_resource_manager_files(self.files, self.values)

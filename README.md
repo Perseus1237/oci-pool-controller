@@ -20,8 +20,8 @@ Terraform configuration and `schema.yaml`; it is why Resource Manager renders
 the deployment inputs instead of treating the repository root as a stack.
 
 The form asks for the controller, pool, network, and OCIR compartments; the
-Function VCN and subnet; an OCIR username and auth token; the existing-pool
-allowlist; safety limits; IAM options; and the optional dedicated Object Storage
+Function VCN and subnet; an OCIR username and auth token; pool-discovery and
+capacity settings; IAM options; and the optional dedicated Object Storage
 ledger-bucket name. During **Apply**, the stack creates a private OCIR repository,
 builds the included Function source, pushes its image, and deploys the Function.
 You do not need to build an image or create a repository before clicking the
@@ -210,9 +210,15 @@ working directory is **`deploy/reference`** (without the GitHub archive-root
 prefix). This directory contains the Terraform files and `schema.yaml` that
 render the deployment form. The form uses OCI selectors for compartments, the
 Function VCN and Function subnets, with subnets filtered to the selected VCN.
-For each pool it asks only for the pool OCID, worker type and approved maximum
-size; Terraform reads the existing pool/configuration to verify tags and derive
-its name, shape, OCPUs and memory. The dedicated Object Storage ledger bucket
+Pool discovery is enabled by default: during Plan, Terraform finds pools in the
+selected pool compartment with an existing `HarnessId` group and uses their
+`ScaleTestProfile` tags as profile keys. If that compartment contains exactly
+one nonempty group among nonterminal pools, leave the optional group (`scope_id`)
+blank; otherwise enter the existing group to deploy. This field is not a live
+group selector. The default maximum is three instances per pool, independently
+of its current size; adjust `default_pool_max_size` or optional profile overrides
+for your approved capacity. Terraform reads each selected pool/configuration to
+verify enrollment and derive its name, shape, OCPUs and memory. The dedicated Object Storage ledger bucket
 is created automatically. The full source `.tar.gz` is for review, not Resource
 Manager. Follow the [deployment guide](deploy/reference/README.md) first:
 existing pools/networking, an OCIR username/auth token for the default build,
@@ -235,12 +241,25 @@ and review a plan before applying. Keep `dry_run = true` and
 `enable_termination = false` for initial validation. A deploy button does not
 replace release approval or the staging checks in the runbook.
 
+Discovery also preserves the controller group and each profile-to-pool binding
+after the first Apply. A changed group, replacement pool under an old profile,
+or removal of an enrolled profile is blocked. Retiring an enrollment requires
+a deliberate ledger/enrollment migration; losing tags must not silently discard
+controller history.
+
 ## Configuration and upgrade boundary
 
 Profiles use `worker_type` in Terraform and `workerType` in Function profile
 JSON/status output. These are descriptive worker-class labels, not OCI shape
 identifiers; Terraform derives shape, OCPUs and memory from the attached
 immutable instance configuration and validates them at plan time.
+With automatic discovery, `worker_type` defaults to the `ScaleTestProfile` key;
+`pool_overrides` can set its label or maximum size per profile. The Plan and
+outputs list the exact pool IDs that will be pinned in the Function. Discovery
+runs on each new Plan, not while the Function runs: review pool additions and
+removals before every Apply. Missing or conflicting enrollment tags must be
+corrected through the pool owner's existing workflow; this stack does not tag,
+create or resize pools during deployment.
 Invoke the example as `examples/pool_controller.py`. The release archive and
 default deployment prefix are `oci-pool-controller`.
 
@@ -251,6 +270,9 @@ resource naming, pool keys/OCIDs, scope ID and ledger ownership where needed;
 changing defaults can rename or replace resources. Never reset retirement
 records or generation counters to adopt the new naming. See the
 [deployment guide](deploy/reference/README.md) before migration.
+Existing nonempty `pools` maps take precedence over automatic discovery, so an
+older stack keeps its explicit allowlist. For a new manually configured stack,
+disable `auto_discover_pools` and use the advanced `pools` map.
 
 The source still supports only its documented Intel Flex profiles. Generic
 naming does not add support for arbitrary shapes, regions, scheduler products

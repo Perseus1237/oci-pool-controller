@@ -9,22 +9,22 @@ data "oci_core_subnet" "function" {
 }
 
 data "oci_core_instance_pool" "enrolled" {
-  for_each = var.pools
+  for_each = module.enrollment.pools
 
   instance_pool_id = each.value.pool_id
 }
 
 data "oci_core_instance_configuration" "enrolled" {
-  for_each = var.pools
+  for_each = module.enrollment.pools
 
   instance_configuration_id = data.oci_core_instance_pool.enrolled[each.key].instance_configuration_id
 }
 
 locals {
-  suffix             = substr(sha256("${var.controller_compartment_ocid}:${var.scope_id}"), 0, 8)
+  suffix             = substr(sha256("${var.controller_compartment_ocid}:${module.enrollment.scope_id}"), 0, 8)
   dynamic_group_name = coalesce(var.dynamic_group_name, "${var.name_prefix}-${local.suffix}")
   ledger_bucket_name = coalesce(var.ledger_bucket_name, "${var.name_prefix}-ledger-${local.suffix}")
-  tags               = { ManagedBy = "terraform", ControllerScope = var.scope_id }
+  tags               = { ManagedBy = "terraform", ControllerScope = module.enrollment.scope_id }
   function_subnets_valid = alltrue([
     for subnet in data.oci_core_subnet.function :
     subnet.compartment_id == var.network_compartment_ocid && subnet.vcn_id == var.function_vcn_ocid
@@ -34,14 +34,14 @@ locals {
     key => try(configuration.instance_details[0].launch_details[0], null)
   }
   pool_contract_valid = {
-    for key, pool in var.pools : key => alltrue([
+    for key, pool in module.enrollment.pools : key => alltrue([
       data.oci_core_instance_pool.enrolled[key].compartment_id == var.pool_compartment_ocid,
-      lookup(data.oci_core_instance_pool.enrolled[key].freeform_tags, "HarnessId", "") == var.scope_id,
+      lookup(data.oci_core_instance_pool.enrolled[key].freeform_tags, "HarnessId", "") == module.enrollment.scope_id,
       lookup(data.oci_core_instance_pool.enrolled[key].freeform_tags, "ScaleTestProfile", "") == key,
       data.oci_core_instance_configuration.enrolled[key].compartment_id == var.pool_compartment_ocid,
-      lookup(data.oci_core_instance_configuration.enrolled[key].freeform_tags, "HarnessId", "") == var.scope_id,
+      lookup(data.oci_core_instance_configuration.enrolled[key].freeform_tags, "HarnessId", "") == module.enrollment.scope_id,
       lookup(data.oci_core_instance_configuration.enrolled[key].freeform_tags, "ScaleTestProfile", "") == key,
-      try(local.pool_launch_details[key].freeform_tags["HarnessId"] == var.scope_id, false),
+      try(local.pool_launch_details[key].freeform_tags["HarnessId"] == module.enrollment.scope_id, false),
       try(local.pool_launch_details[key].freeform_tags["ScaleTestProfile"] == key, false),
       try(local.pool_launch_details[key].freeform_tags["InstanceTerminationProtectionEnabled"] == "1", false),
       try(contains(["VM.Standard3.Flex", "VM.Optimized3.Flex"], local.pool_launch_details[key].shape), false),
@@ -52,7 +52,7 @@ locals {
     ])
   }
   profiles = {
-    for key, pool in var.pools : key => {
+    for key, pool in module.enrollment.pools : key => {
       poolId      = pool.pool_id
       poolName    = data.oci_core_instance_pool.enrolled[key].display_name
       displayName = data.oci_core_instance_pool.enrolled[key].display_name
@@ -163,7 +163,7 @@ locals {
     AUTH_MODE                        = "oci_iam"
     FUNCTION_ROLE                    = "control"
     COMPARTMENT_OCID                 = var.pool_compartment_ocid
-    HARNESS_ID                       = var.scope_id
+    HARNESS_ID                       = module.enrollment.scope_id
     DRY_RUN                          = tostring(var.dry_run)
     ENABLE_TERMINATION               = tostring(var.enable_termination)
     FLAG_TAG_KEY                     = "InstanceTerminationProtectionEnabled"
@@ -197,12 +197,12 @@ resource "oci_functions_function" "controller" {
       error_message = "Inline registry/configuration is too large for OCI Functions' 4-KB limit. Shorten metadata or use separately reviewed non-overlapping controller shards; an external registry is not implemented."
     }
     precondition {
-      condition     = length(var.pools) <= var.max_profiles && alltrue([for pool in values(var.pools) : pool.max_size <= var.max_pool_size])
+      condition     = length(module.enrollment.pools) <= var.max_profiles && alltrue([for pool in values(module.enrollment.pools) : pool.max_size <= var.max_pool_size])
       error_message = "Pool enrollment exceeds an explicit controller profile or per-pool ceiling."
     }
     precondition {
       condition     = alltrue(values(local.pool_contract_valid))
-      error_message = "Each enrolled pool and its immutable launch configuration must be in the configured pool compartment, carry matching HarnessId and ScaleTestProfile tags, use the exact protection tag value 1, and have a supported Intel Flex shape/configuration."
+      error_message = "Invalid enrolled pools: ${join(", ", [for key, valid in local.pool_contract_valid : "${key} (${module.enrollment.pools[key].pool_id}, configuration ${data.oci_core_instance_pool.enrolled[key].instance_configuration_id})" if !valid])}. Pool and configuration must be in the selected compartment with matching HarnessId/ScaleTestProfile tags; launch tags must match and protection must be exactly 1, with a supported Intel Flex shape/configuration. Have the pool owner correct the configuration; no automatic retagging occurs."
     }
     precondition {
       condition     = var.max_active_pools <= var.max_profiles

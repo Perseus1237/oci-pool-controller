@@ -8,7 +8,6 @@ network_compartment_ocid     = "ocid1.compartment.oc1..REPLACE_NETWORK"
 function_vcn_ocid            = "ocid1.vcn.oc1.iad.REPLACE_FUNCTION_VCN"
 registry_compartment_ocid    = "ocid1.compartment.oc1..REPLACE_REGISTRY"
 subnet_ids                  = ["ocid1.subnet.oc1.iad.REPLACE_FUNCTION_SUBNET"]
-scope_id                    = "pool-controller-staging-01"
 build_function_image        = true
 ocir_username               = "Default/REPLACE_USERNAME"
 # Set sensitive ocir_auth_token in Resource Manager, or TF_VAR_ocir_auth_token
@@ -24,16 +23,34 @@ enable_termination    = false
 create_iam_resources  = false
 invoker_group_ocids   = ["ocid1.group.oc1..REPLACE_APPROVED_CALLER_GROUP"]
 
-# Start with one small existing staging pool. Increase only after measurement.
+# Discover the existing tagged pools in the selected pool compartment during Plan.
+# Leave scope_id blank only when exactly one existing HarnessId group is present.
+# If there are multiple groups, enter the existing HarnessId value to select one.
+# This stack does not create, resize or retag pools. Review every Plan's exact IDs.
+auto_discover_pools   = true
+scope_id             = ""
+default_pool_max_size = 3 # Approved ceiling per pool, not its current/desired size.
+
+# Optional overrides keyed by an existing ScaleTestProfile tag. Without an
+# override, worker_type is the profile key and max_size is the default above.
+# pool_overrides = {
+#   small = { max_size = 5, worker_type = "small-worker" }
+# }
+
+# Start with a small existing staging group. Increase only after measurement.
 max_profiles       = 6
 max_pool_size      = 50
 max_active_pools   = 1
 max_total_ocpus    = 16
 
-pools = {
-  small = {
-    pool_id       = "ocid1.instancepool.oc1.iad.REPLACE_POOL"
-    worker_type   = "small-worker"
-    max_size      = 3
-  }
-}
+# Optional advanced manual enrollment. A nonempty pools map takes precedence
+# over discovery, preserving existing stacks. For a new manual stack, set:
+# auto_discover_pools = false
+# scope_id           = "REPLACE_WITH_EXISTING_HARNESS_ID"
+# pools = {
+#   small = {
+#     pool_id     = "ocid1.instancepool.oc1.iad.REPLACE_POOL"
+#     worker_type = "small-worker"
+#     max_size    = 3
+#   }
+# }

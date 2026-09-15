@@ -58,12 +58,13 @@ variable "name_prefix" {
 }
 
 variable "scope_id" {
-  description = "Existing HarnessId enrollment tag; use a distinct ID per controller/environment."
+  description = "Existing HarnessId controller-group tag. Leave blank for discovery to infer the group when exactly one is present; specify it when multiple groups exist."
   type        = string
+  default     = ""
 
   validation {
-    condition     = can(regex("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$", var.scope_id))
-    error_message = "scope_id must be a non-empty request-ID-compatible identifier."
+    condition     = var.scope_id == "" || can(regex("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$", var.scope_id))
+    error_message = "Leave scope_id blank for discovery or use a request-ID-compatible identifier."
   }
 }
 
@@ -114,21 +115,58 @@ variable "function_shape" {
   }
 }
 
+variable "auto_discover_pools" {
+  description = "Discover enrolled pools in the selected pool compartment from their existing HarnessId and ScaleTestProfile tags. A nonempty manual pools map takes precedence for backwards compatibility."
+  type        = bool
+  default     = true
+}
+
+variable "default_pool_max_size" {
+  description = "Approved maximum worker count for each discovered pool unless its profile has a max_size override."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.default_pool_max_size >= 1 && floor(var.default_pool_max_size) == var.default_pool_max_size
+    error_message = "default_pool_max_size must be a positive integer."
+  }
+}
+
+variable "pool_overrides" {
+  description = "Optional discovery overrides keyed by ScaleTestProfile. Set only the worker_type or approved max_size values that should differ from discovery defaults."
+  type = map(object({
+    worker_type = optional(string)
+    max_size    = optional(number)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for key, pool in var.pool_overrides :
+      can(regex("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$", key)) &&
+      (pool.worker_type == null ? true : length(trimspace(pool.worker_type)) > 0 && length(pool.worker_type) <= 255) &&
+      (pool.max_size == null ? true : pool.max_size >= 1 && floor(pool.max_size) == pool.max_size)
+    ])
+    error_message = "Override keys must be valid profile identifiers; supplied worker_type must be 1-255 characters and max_size must be a positive integer."
+  }
+}
+
 variable "pools" {
-  description = "Pinned existing-pool allowlist. Terraform reads each pool and immutable launch configuration to derive its name, Intel shape, OCPUs and memory; keys must match each pool/configuration/worker ScaleTestProfile tag."
+  description = "Optional pinned existing-pool allowlist. A nonempty map takes precedence over automatic discovery for backwards compatibility. Terraform derives pool name, Intel shape, OCPUs and memory; keys must match each pool/configuration/worker ScaleTestProfile tag."
   type = map(object({
     pool_id     = string
     worker_type = string
     max_size    = number
   }))
+  default = {}
 
   validation {
-    condition = length(var.pools) > 0 && alltrue([
+    condition = alltrue([
       for key, pool in var.pools : can(regex("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$", key)) &&
-      startswith(pool.pool_id, "ocid1.instancepool.") && length(pool.worker_type) > 0 &&
+      startswith(pool.pool_id, "ocid1.instancepool.") && length(trimspace(pool.worker_type)) > 0 && length(pool.worker_type) <= 255 &&
       pool.max_size >= 1 && floor(pool.max_size) == pool.max_size
     ])
-    error_message = "Each entry must pin an existing pool, include worker_type and use a positive integer max_size."
+    error_message = "Each entry must pin an existing pool, include a worker_type of 1-255 characters and use a positive integer max_size."
   }
 
   validation {

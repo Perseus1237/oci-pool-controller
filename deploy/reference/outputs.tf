@@ -44,6 +44,11 @@ output "iam_review" {
 }
 
 output "pool_registry" {
-  description = "Reviewed server-owned registry. Terraform does not retag or resize these pools."
+  description = "Exact pinned pool registry to review in every Plan. Terraform does not retag or resize these pools."
   value       = local.profiles
+}
+
+output "enrollment_review" {
+  description = "Plan-time discovery/manual selection, controller group, included/excluded OCIDs and exact profile limits. New discovery results take effect only through a subsequent Apply."
+  value       = merge(module.enrollment.review, { pools = local.profiles })
 }
