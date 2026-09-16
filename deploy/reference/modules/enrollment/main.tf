@@ -1,5 +1,10 @@
 # Provider-free enrollment selection. Discovery is evaluated during Plan; the
 # caller pins this result into Function configuration, never runtime discovery.
+variable "enroll_pools" {
+  type    = bool
+  default = false
+}
+
 variable "auto_discover_pools" {
   type    = bool
   default = true
@@ -72,8 +77,10 @@ variable "candidates" {
 }
 
 locals {
-  # Older stacks already store a manual map. A new default must never expand it.
-  automatic = var.auto_discover_pools && length(var.pools) == 0
+  # Legacy explicit maps remain authoritative despite the new deploy-only
+  # default. Existing discovered enrollments are protected by identity guards.
+  enrollment_requested = var.enroll_pools || length(var.pools) > 0
+  automatic            = local.enrollment_requested && var.auto_discover_pools && length(var.pools) == 0
   active_candidates = [for pool in var.candidates : pool
     if !contains(["TERMINATING", "TERMINATED"], upper(pool.state))
   ]
@@ -81,11 +88,13 @@ locals {
     for pool in local.active_candidates : lookup(pool.freeform_tags, "HarnessId", "")
   ])))
   effective_scope = var.scope_id != "" ? var.scope_id : (
-    local.automatic && length(local.available_scopes) == 1 ? local.available_scopes[0] : ""
+    !local.enrollment_requested ? "controller-${terraform_data.controller_identity.id}" : (
+      local.automatic && length(local.available_scopes) == 1 ? local.available_scopes[0] : ""
+    )
   )
-  selected = [for pool in local.active_candidates : pool if local.automatic &&
+  selected = local.automatic ? [for pool in local.active_candidates : pool if
     local.effective_scope != "" && lookup(pool.freeform_tags, "HarnessId", "") == local.effective_scope
-  ]
+  ] : []
   profile_groups = {
     for pool in local.selected : lookup(pool.freeform_tags, "ScaleTestProfile", "") => pool...
   }
@@ -106,6 +115,10 @@ locals {
   unknown_overrides = setsubtract(toset(keys(var.pool_overrides)), toset(keys(local.discovered_pools)))
   included_ids      = sort([for pool in values(local.effective_pools) : pool.pool_id])
 }
+
+# Always retain this identity so later enrollment cannot generate a different
+# controller scope. Existing/manual first deployments still use their tag scope.
+resource "terraform_data" "controller_identity" {}
 
 # Preserve the original controller identity across later discovery refreshes.
 # New tags/groups must not silently select a new ledger or resource name suffix.
@@ -154,8 +167,8 @@ output "pools" {
     error_message = "No valid controller group is selected. Discovery needs an existing HarnessId tag, or set scope_id explicitly. Manual mode requires scope_id. This stack does not create or repair pool tags."
   }
   precondition {
-    condition     = length(local.effective_pools) > 0
-    error_message = "No pools are enrolled. In discovery mode, prepare pools with HarnessId and ScaleTestProfile tags in the selected compartment/group. In manual mode, supply the pools allowlist. No pools were modified."
+    condition     = !local.enrollment_requested || length(local.effective_pools) > 0
+    error_message = "Pool enrollment was requested but no pools matched. Prepare pools with matching HarnessId/ScaleTestProfile tags in the selected compartment/group, or supply the manual allowlist. For a new controller without pools, disable Enroll existing pools now. Existing enrollments cannot be silently removed."
   }
   precondition {
     condition     = length(local.invalid_profile_ids) == 0
@@ -171,13 +184,13 @@ output "pools" {
   }
   precondition {
     condition     = local.automatic ? length(local.unknown_overrides) == 0 : length(var.pool_overrides) == 0
-    error_message = "Discovery overrides must reference selected ScaleTestProfile keys only (${join(", ", sort(tolist(local.unknown_overrides)))}). In manual mode, put worker_type/max_size in pools instead."
+    error_message = "Discovery overrides must reference selected ScaleTestProfile keys only (${join(", ", sort(tolist(local.unknown_overrides)))}). Leave overrides empty when deploying without pools. In manual mode, put worker_type/max_size in pools instead."
   }
 }
 
 output "review" {
   value = {
-    mode              = local.automatic ? "automatic" : "manual"
+    mode              = !local.enrollment_requested ? "awaiting_enrollment" : (local.automatic ? "automatic" : "manual")
     scope_id          = local.effective_scope
     available_groups  = local.automatic ? local.available_scopes : []
     included_pool_ids = local.included_ids

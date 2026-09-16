@@ -11,34 +11,34 @@
       "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
     },
     {
-      "bytes": 14653,
+      "bytes": 15009,
       "path": "deploy/reference/main.tf",
-      "sha256": "8bc0ab14d339e57842a6efa6114e0a6997db0de907fb8e712fb065aeae4f67f1"
+      "sha256": "136f9767debdcd9af08fc7f3ff02490b2209b9f2dc0d5e6f28eaf78e76cf0a37"
     },
     {
-      "bytes": 1917,
+      "bytes": 2191,
       "path": "deploy/reference/outputs.tf",
-      "sha256": "76a656e5a5bf0a65f9ca992ea65dd88331455e1b82ebb01d20c45ada3a05c27d"
+      "sha256": "6313a8ab2bd9e02e81493d7e12443ee7e408e33aed9df892877079b7a7b9a1fa"
     },
     {
-      "bytes": 25451,
+      "bytes": 29707,
       "path": "deploy/reference/README.md",
-      "sha256": "87bf214e7a93406b6be51b92866df0533573cb75d59a47be709b2cca6ef52791"
+      "sha256": "9122db79426a15e9e4f7769351d010af762e19d360cf970af08dbac53c8c1dcf"
     },
     {
       "path": "deploy/reference/schema.yaml",
-      "bytes": 8621,
-      "sha256": "7bec3280e7c02f8afbb976e43bf977881b748554300e66200dac5261d0ace006"
+      "bytes": 9355,
+      "sha256": "b021f117028740ce47522f5e130d4005e9510c79d6e49d178e95d78c509dd8bf"
     },
     {
-      "bytes": 2874,
+      "bytes": 3518,
       "path": "deploy/reference/terraform.tfvars.example",
-      "sha256": "ffbd8e392ac08167d69d0f4a1eb2ff8c5e726ea0dddfe516752518f441ea6f19"
+      "sha256": "66d5fef3275e855c844614c3b3a75a2a262785ecfaf54763bd38ce71d4a0c3ee"
     },
     {
-      "bytes": 10429,
+      "bytes": 11172,
       "path": "deploy/reference/variables.tf",
-      "sha256": "c0200ceb55f609b0144a27d475c2ea47256b5fb47a588afa4e6f7b2bca5afb78"
+      "sha256": "18cb9cc3fcbc9ad6e95ad0c7dc79a5f6633487266f81a3211ad51e8d7060d2f4"
     },
     {
       "bytes": 590,
@@ -81,9 +81,9 @@
       "sha256": "ea68ddf0cb744ee92ebada5a981c6a1a3f083cfd815e13d89b19bba4dcc56ed1"
     },
     {
-      "bytes": 164307,
+      "bytes": 167060,
       "path": "function/func.py",
-      "sha256": "3b347cb35b1ec2e2bfd5b123ccad6174cb40e5745ec222e862915402d362e060"
+      "sha256": "21fed5907d3b7237b6c8fc6f884bca08b4bede4ce640f01906fac95bf78128e6"
     },
     {
       "bytes": 26,
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 18948,
+      "bytes": 20720,
       "path": "README.md",
-      "sha256": "0ac42e5a55041680b070b5a6fb2ec6cbadee10f54ed30d1f4c09dcd477412ff6"
+      "sha256": "75b04d06bf1b5a2d60d9793b72e4b3d2929bc934ed90ff3d4f7ee9029ac68652"
     },
     {
       "bytes": 2889,
@@ -137,23 +137,28 @@
     },
     {
       "path": "tests/test_resource_manager_deployment.py",
-      "bytes": 11296,
-      "sha256": "352bc17c4c711ce9f236d46ff2b3622a135a4ca9b0f673ed0150329034498687"
+      "bytes": 13673,
+      "sha256": "31244075738ffad92240468ef13e8735ec905fa3ccf2d807dddddb117b75499b"
     },
     {
       "path": "deploy/reference/enrollment.tf",
-      "bytes": 894,
-      "sha256": "773bb96f399e7ee520e83d47ae9958220d17b8978b389bdebe0c500e9ed3a6af"
+      "bytes": 1405,
+      "sha256": "47842d5ddb88ebbe6a738d895b2f8b5aa8cfbbc5f0e5fb9ed47dc478efe5bebb"
     },
     {
       "path": "deploy/reference/modules/enrollment/main.tf",
-      "bytes": 8074,
-      "sha256": "0a776abf10c4c40ce40f899ee143e363018a0b84d89949e8ff4e28800b9d0172"
+      "bytes": 8871,
+      "sha256": "7346888f26bc4e5746c6648236a1e5129f2f8bd55eb57d7100184bde84a2059e"
     },
     {
       "path": "tests/test_pool_enrollment.py",
-      "bytes": 14525,
-      "sha256": "968fca2ec5e46b27e8bcd5abb1119f46b3b1f8c4d6017e83426a1e8549c0daef"
+      "bytes": 20579,
+      "sha256": "d6c7a7d4db47fa797d122a371416f2c285cff05e2e065e8db6107781d501d65c"
+    },
+    {
+      "path": "tests/test_empty_enrollment.py",
+      "bytes": 12157,
+      "sha256": "03e75daec35daa22e34a788012aa7d7cc66c0f8cb383466350734586431746ba"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",

@@ -12,6 +12,13 @@ data "oci_core_instance_pool" "enrolled" {
   for_each = module.enrollment.pools
 
   instance_pool_id = each.value.pool_id
+
+  lifecycle {
+    precondition {
+      condition     = var.pool_compartment_ocid != ""
+      error_message = "An explicit pool compartment is required for automatic or manual enrollment."
+    }
+  }
 }
 
 data "oci_core_instance_configuration" "enrolled" {
@@ -72,6 +79,8 @@ locals {
     "Allow service FaaS to read repos in compartment id ${var.registry_compartment_ocid}",
   ]
   controller_policy_statements = concat([
+    "Allow dynamic-group ${local.dynamic_group_name} to manage objects in compartment id ${var.controller_compartment_ocid} where all {target.bucket.name = '${oci_objectstorage_bucket.ledger.name}', any {request.permission = 'OBJECT_CREATE', request.permission = 'OBJECT_READ', request.permission = 'OBJECT_OVERWRITE'}}",
+    ], local.enrollment_requested ? [
     "Allow dynamic-group ${local.dynamic_group_name} to read instance-pools in compartment id ${var.pool_compartment_ocid}",
     "Allow dynamic-group ${local.dynamic_group_name} to manage instance-pools in compartment id ${var.pool_compartment_ocid} where request.permission = 'INSTANCE_POOL_UPDATE'",
     "Allow dynamic-group ${local.dynamic_group_name} to read instance-configurations in compartment id ${var.pool_compartment_ocid}",
@@ -84,8 +93,7 @@ locals {
     "Allow dynamic-group ${local.dynamic_group_name} to read instances in compartment id ${var.pool_compartment_ocid}",
     "Allow dynamic-group ${local.dynamic_group_name} to use instances in compartment id ${var.pool_compartment_ocid} where request.permission = 'INSTANCE_UPDATE'",
     "Allow dynamic-group ${local.dynamic_group_name} to use volumes in compartment id ${var.pool_compartment_ocid}",
-    "Allow dynamic-group ${local.dynamic_group_name} to manage objects in compartment id ${var.controller_compartment_ocid} where all {target.bucket.name = '${oci_objectstorage_bucket.ledger.name}', any {request.permission = 'OBJECT_CREATE', request.permission = 'OBJECT_READ', request.permission = 'OBJECT_OVERWRITE'}}",
-    ], var.enable_termination ? [
+    ] : [], local.enrollment_requested && var.enable_termination ? [
     "Allow dynamic-group ${local.dynamic_group_name} to manage instance-pools in compartment id ${var.pool_compartment_ocid} where request.permission = 'INSTANCE_POOL_INSTANCE_DETACH'",
     "Allow dynamic-group ${local.dynamic_group_name} to manage instances in compartment id ${var.pool_compartment_ocid} where ANY {request.permission = 'INSTANCE_DELETE', request.permission = 'INSTANCE_DETACH_VOLUME'}",
     "Allow dynamic-group ${local.dynamic_group_name} to manage volume-attachments in compartment id ${var.pool_compartment_ocid} where request.permission = 'VOLUME_ATTACHMENT_DELETE'",
@@ -162,7 +170,8 @@ locals {
     CONTROLLER_ONLY                  = "true"
     AUTH_MODE                        = "oci_iam"
     FUNCTION_ROLE                    = "control"
-    COMPARTMENT_OCID                 = var.pool_compartment_ocid
+    COMPARTMENT_OCID                 = local.target_pool_compartment_id
+    ALLOW_EMPTY_POOL_REGISTRY        = tostring(!local.enrollment_requested)
     HARNESS_ID                       = module.enrollment.scope_id
     DRY_RUN                          = tostring(var.dry_run)
     ENABLE_TERMINATION               = tostring(var.enable_termination)

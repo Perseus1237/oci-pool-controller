@@ -48,6 +48,11 @@ output "pool_registry" {
   value       = local.profiles
 }
 
+output "controller_scope_id" {
+  description = "Stable HarnessId value for pools, instance configurations and launch tags enrolled into this controller. Persist this value; later enrollment reuses the same Function and ledger."
+  value       = module.enrollment.scope_id
+}
+
 output "enrollment_review" {
   description = "Plan-time discovery/manual selection, controller group, included/excluded OCIDs and exact profile limits. New discovery results take effect only through a subsequent Apply."
   value       = merge(module.enrollment.review, { pools = local.profiles })

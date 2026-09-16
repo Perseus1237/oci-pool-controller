@@ -13,8 +13,14 @@ variable "controller_compartment_ocid" {
 }
 
 variable "pool_compartment_ocid" {
-  description = "Single existing compartment containing all enrolled pools, configurations and workers."
+  description = "Required when enrolling pools: single existing compartment containing the pools, configurations and workers. Leave blank when deploying now and enrolling later."
   type        = string
+  default     = ""
+
+  validation {
+    condition     = var.pool_compartment_ocid == "" || startswith(var.pool_compartment_ocid, "ocid1.compartment.")
+    error_message = "Leave the pool compartment blank for deploy-only mode, or supply a compartment OCID for enrollment."
+  }
 }
 
 variable "network_compartment_ocid" {
@@ -58,7 +64,7 @@ variable "name_prefix" {
 }
 
 variable "scope_id" {
-  description = "Existing HarnessId controller-group tag. Leave blank for discovery to infer the group when exactly one is present; specify it when multiple groups exist."
+  description = "Optional stable controller group. Deploy-only mode generates it when blank; use output controller_scope_id for later pool tags. Initial enrollment can infer a sole existing HarnessId group. An applied controller's group cannot change."
   type        = string
   default     = ""
 
@@ -113,6 +119,12 @@ variable "function_shape" {
     condition     = contains(["GENERIC_ARM", "GENERIC_X86"], var.function_shape)
     error_message = "Choose GENERIC_ARM or GENERIC_X86 to match the built image."
   }
+}
+
+variable "enroll_pools" {
+  description = "Enroll existing pools during this deployment. Leave disabled to deploy the Function now and enroll later. A saved nonempty manual pools map remains authoritative; existing discovery stacks must enable this when upgrading."
+  type        = bool
+  default     = false
 }
 
 variable "auto_discover_pools" {

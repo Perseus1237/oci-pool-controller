@@ -18,6 +18,9 @@ TERRAFORM = shutil.which("terraform")
 MODULE = Path(__file__).resolve().parents[1] / "deploy/reference/modules/enrollment"
 COMPARTMENT = "ocid1.compartment.oc1..test-pools"
 DEFAULTS = {
+    # Existing discovery cases explicitly opt in. Separate tests below omit
+    # this module argument entirely to verify the deploy-first default.
+    "enroll_pools": True,
     "auto_discover_pools": True,
     "scope_id": "",
     "default_pool_max_size": 3,
@@ -102,12 +105,15 @@ class PoolEnrollmentTests(unittest.TestCase):
         return {name: output["value"] for name, output in outputs.items()}
 
     @contextlib.contextmanager
-    def applied_state(self, candidates):
+    def applied_state(self, candidates, module_defaults=False, **values):
         # Apply only built-in terraform_data guards to disposable local state.
         with tempfile.TemporaryDirectory(prefix="pool-identity-guard-test-") as temporary:
             root = Path(temporary)
-            shutil.copyfile(self.root / "main.tf.json", root / "main.tf.json")
-            inputs = dict(DEFAULTS, candidates=candidates)
+            harness = json.loads((self.root / "main.tf.json").read_text(encoding="utf-8"))
+            if module_defaults:
+                del harness["module"]["enrollment"]["enroll_pools"]
+            (root / "main.tf.json").write_text(json.dumps(harness), encoding="utf-8")
+            inputs = dict(DEFAULTS, candidates=candidates, **values)
             (root / "input.tfvars.json").write_text(json.dumps(inputs), encoding="utf-8")
             initialized = self.terraform("init", "-backend=false", "-input=false", "-no-color", root=root)
             self.assertEqual(initialized.returncode, 0, initialized.stdout + initialized.stderr)
@@ -118,13 +124,25 @@ class PoolEnrollmentTests(unittest.TestCase):
             self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
             yield root
 
-    def state_plan(self, root, candidates):
-        inputs = dict(DEFAULTS, candidates=candidates)
+    def state_plan(self, root, candidates, **values):
+        inputs = dict(DEFAULTS, candidates=candidates, **values)
         (root / "input.tfvars.json").write_text(json.dumps(inputs), encoding="utf-8")
         return self.terraform(
             "plan", "-input=false", "-no-color", "-detailed-exitcode",
             "-var-file=input.tfvars.json", "-out=updated-plan.bin", root=root,
         )
+
+    def state_values(self, root):
+        shown = self.terraform("show", "-json", root=root)
+        self.assertEqual(shown.returncode, 0, shown.stdout + shown.stderr)
+        values = json.loads(shown.stdout)["values"]
+        outputs = {name: output["value"] for name, output in values["outputs"].items()}
+        resources = {
+            resource["address"]: resource["values"]["id"]
+            for child in values["root_module"].get("child_modules", [])
+            for resource in child.get("resources", [])
+        }
+        return outputs, resources
 
     def test_single_scope_derives_keys_worker_labels_and_fixed_default_ceiling(self):
         # Current capacity is not an approved controller ceiling. Extra OCI
@@ -234,7 +252,7 @@ class PoolEnrollmentTests(unittest.TestCase):
             },
         }
         result = self.plan(
-            scope_id="retained-scope", pools=pools,
+            enroll_pools=False, scope_id="retained-scope", pools=pools,
             candidates=[candidate("auto-a", scope="a"), candidate("auto-b", scope="b")],
         )
         self.assertEqual(result["scope_id"], "retained-scope")
@@ -296,6 +314,87 @@ class PoolEnrollmentTests(unittest.TestCase):
         with self.applied_state(pools) as root:
             unchanged = self.state_plan(root, pools)
             self.assertEqual(unchanged.returncode, 0, unchanged.stdout + unchanged.stderr)
+
+    def test_default_mode_deploys_empty_registry_with_persistent_generated_scope(self):
+        # Omit enroll_pools from the module call, not merely pass false, so this
+        # tests the real public default independently of the discovery fixture.
+        with self.applied_state([], module_defaults=True) as root:
+            initial, resources = self.state_values(root)
+            self.assertRegex(initial["scope_id"], r"^controller-[0-9a-f-]{36}$")
+            self.assertEqual(initial["pools"], {})
+            self.assertEqual(initial["review"]["mode"], "awaiting_enrollment")
+            self.assertEqual(initial["review"]["included_pool_ids"], [])
+            self.assertEqual(set(resources), {
+                "module.enrollment.terraform_data.controller_identity",
+                "module.enrollment.terraform_data.scope_guard",
+            })
+            unchanged = self.state_plan(root, [])
+            self.assertEqual(unchanged.returncode, 0, unchanged.stdout + unchanged.stderr)
+            subsequent, subsequent_resources = self.state_values(root)
+            self.assertEqual(subsequent["scope_id"], initial["scope_id"])
+            self.assertEqual(subsequent_resources, resources)
+
+    def test_standby_preserves_explicit_scope_and_ignores_unrelated_candidates(self):
+        candidates = [
+            candidate("pool-a", scope="other-a", profile=None),
+            candidate("pool-b", scope="other-b", profile="bad profile"),
+        ]
+        result = self.plan(enroll_pools=False, scope_id="chosen-controller", candidates=candidates)
+        self.assertEqual(result["scope_id"], "chosen-controller")
+        self.assertEqual(result["pools"], {})
+        self.assertEqual(result["review"]["mode"], "awaiting_enrollment")
+        self.assertEqual(result["review"]["included_pool_ids"], [])
+
+    def test_standby_rejects_discovery_overrides_instead_of_silently_ignoring_them(self):
+        self.plan(
+            succeed=False, enroll_pools=False, scope_id="new-controller",
+            pool_overrides={"small": {"max_size": 2}},
+        )
+
+    def test_first_matching_enrollment_preserves_generated_identity_and_adds_only_pool_guard(self):
+        with self.applied_state([], enroll_pools=False) as root:
+            initial, original_resources = self.state_values(root)
+            pool = candidate("first-pool", scope=initial["scope_id"])
+            changed = self.state_plan(root, [pool], enroll_pools=True)
+            self.assertEqual(changed.returncode, 2, changed.stdout + changed.stderr)
+            shown = self.terraform("show", "-json", "updated-plan.bin", root=root)
+            self.assertEqual(shown.returncode, 0, shown.stdout + shown.stderr)
+            plan = json.loads(shown.stdout)
+            changes = [
+                change for change in plan["resource_changes"]
+                if change["change"]["actions"] != ["no-op"]
+            ]
+            self.assertEqual(len(changes), 1, changes)
+            self.assertEqual(changes[0]["address"], 'module.enrollment.terraform_data.pool_identity_guard["small"]')
+            self.assertEqual(changes[0]["change"]["actions"], ["create"])
+            enrolled = self.terraform("apply", "-input=false", "-no-color", "updated-plan.bin", root=root)
+            self.assertEqual(enrolled.returncode, 0, enrolled.stdout + enrolled.stderr)
+            final, final_resources = self.state_values(root)
+            self.assertEqual(final["scope_id"], initial["scope_id"])
+            self.assertEqual(final["review"]["mode"], "automatic")
+            self.assertEqual(final["pools"]["small"]["pool_id"], pool["id"])
+            for address, identity in original_resources.items():
+                self.assertEqual(final_resources[address], identity)
+
+    def test_first_enrollment_cannot_switch_generated_controller_to_another_group(self):
+        with self.applied_state([], enroll_pools=False) as root:
+            changed = self.state_plan(root, [candidate("wrong-group", scope="unrelated-scope")])
+            self.assertEqual(changed.returncode, 1, changed.stdout + changed.stderr)
+            self.assertIn("Resource postcondition failed", changed.stdout + changed.stderr)
+
+    def test_existing_enrollment_cannot_silently_fall_back_to_standby(self):
+        pool = candidate("pool-a")
+        with self.applied_state([pool]) as root:
+            changed = self.state_plan(root, [], enroll_pools=False, scope_id="scope-a")
+            self.assertEqual(changed.returncode, 1, changed.stdout + changed.stderr)
+            self.assertIn("prevent_destroy", changed.stdout + changed.stderr)
+
+    def test_requested_enrollment_still_rejects_empty_registry_after_standby(self):
+        with self.applied_state([], enroll_pools=False) as root:
+            initial, _ = self.state_values(root)
+            changed = self.state_plan(root, [], enroll_pools=True, scope_id=initial["scope_id"])
+            self.assertEqual(changed.returncode, 1, changed.stdout + changed.stderr)
+            self.assertIn("no pools matched", changed.stdout + changed.stderr)
 
 
 if __name__ == "__main__":

@@ -2,16 +2,22 @@
 
 This staging module deploys the **0.12.0-rc.6 controller reference package**, not the demo tenancy. It creates one OCI Function/application, a dedicated private versioned Object Storage ledger, the initial aggregate lease object, invocation logging, and optionally narrowly scoped IAM resources. By default it also creates a private immutable OCIR repository, builds the included Function source, and pushes the image during Apply. It does **not** create, import, resize or retag any instance pool, worker, instance configuration or network, or create an API Gateway, UI, worker terminator or readiness Function.
 
+New stacks deploy the Function in standby by default. Existing pools and
+enrollment tags are not prerequisites for that first deployment; enroll pools
+later by updating the same stack.
+
 This is unsupported sample code; see [DISCLAIMER.md](../../DISCLAIMER.md) and
 [NOTICE.md](../../NOTICE.md). `0.12.0-rc.1` introduces
 generic naming and `workerType` metadata while retaining scaling/retirement safeguards.
 
 ### Existing deployment migration
 
-New stacks discover enrolled pools during Plan by default. Existing nonempty
-`pools` maps continue to take precedence over `auto_discover_pools`, preserving
-an older stack's explicit allowlist even though the new discovery default is
-`true`. Retain that map when upgrading; switching to discovery is an intentional
+Existing stacks that use discovery must explicitly set `enroll_pools = true`
+when upgrading. New stacks default to `enroll_pools = false`, but guards prevent
+that new default from removing an existing enrollment. Existing nonempty
+`pools` maps continue to take precedence over both `enroll_pools = false` and
+`auto_discover_pools`, preserving an older stack's explicit allowlist. Retain
+that map when upgrading; switching to discovery is an intentional
 configuration change. Terraform reads each selected pool and its immutable
 instance configuration to derive its real name, Intel shape, OCPUs and memory,
 then checks the compartment and enrollment/protection tags. `worker_type` is
@@ -25,30 +31,77 @@ ownership. Never reset generations or retirement records for a naming change.
 Review the exact Terraform plan and test a compatible upgrade in staging.
 This module is not an automatic migration of existing lab infrastructure.
 
-For an existing deployment, set `build_function_image = false`, retain `function_image` to keep using its existing image/repository path, and set the matching `function_shape`. The new default `build_function_image = true` selects the source-build path and creates a repository; review that change before applying an upgrade.
+For an existing prebuilt-image deployment, retain `build_function_image = false`, `function_image` and the matching `function_shape` to keep its image/repository path. Existing automatically built stacks should retain `build_function_image = true`; their managed repository has destruction protection. Switching build modes requires a reviewed repository-ownership migration.
 
 The default build uses the accompanying controller Dockerfile. Deploy and test this candidate in operator staging before promotion. Worker readiness in this package remains a diagnostic bootstrap proxy. Your platform retains its own registration and dispatch readiness authority.
 
 ## 1. Prerequisites and ownership
 
 - Review the [integration overview](../../README.md), [client example](../../examples/README.md), and [operations runbook](../../docs/RUNBOOK.md) before deployment.
-- Provide an existing OCI compartment containing the enrolled pools, their immutable instance configurations and workers, plus an existing VCN and Function subnet. One controller targets one pool compartment and region. Use a dedicated staging worker compartment where practical.
+- Provide the controller, network and registry compartments plus an existing VCN and Function subnet. The default standby deployment needs no pools, pool tags or pool compartment. When enabling enrollment, explicitly select an existing compartment containing the pools, their immutable instance configurations and workers. One controller targets one pool compartment and region. Use a dedicated staging worker compartment where practical.
 - For the default source build, provide an OCI username and auth token with permission to push images into the selected registry compartment. The stack creates the private OCIR repository and image during Apply; neither must exist before clicking Deploy. The build uses `linux/amd64` and deploys a `GENERIC_X86` Function. For the optional existing-image path, provide the image address and matching architecture; the digest is optional. Intel **worker** architecture is independent of the Function runtime architecture.
 - The existing Function subnet must have DNS and outbound connectivity to the regional OCI APIs and Object Storage. Its routing, service/NAT gateways, security lists/NSGs and available IPs are the operator's responsibility. This module does not make an invocation endpoint private merely by using a private subnet.
 - Have the tenancy administrator review FaaS image/network access, controller resource-principal permissions, caller permissions, and OCI service limits. Cross-compartment images, volumes, VNICs, subnets, encryption keys or other custom launch dependencies may require additional **reviewed** permissions not inferred by this module.
-- The Resource Manager execution identity needs permission to create the defined resources, including the private OCIR repository in source-build mode, and to list/read pools in the selected pool compartment and read their instance configurations. That plan-time read access lets this module discover enrolled pools and verify their names, shapes, OCPUs and memory instead of accepting them as typed input.
+- The Resource Manager execution identity needs permission to create the defined resources, including the private OCIR repository in source-build mode. Standby performs no pool listing or reads. Enrollment additionally requires permission to list/read pools in the selected pool compartment and read their instance configurations so Plan can discover and verify them.
 - Protect Resource Manager stack variables, state and saved plans. `ocir_auth_token` is marked sensitive and used only for registry login, but Terraform 1.5 can retain sensitive inputs in state/plans. For local Terraform, configure an access-controlled, encrypted backend with locking and backups; this module does not prescribe one. Never commit tokens, populated `.tfvars`, state or plan files.
 
-## 2. Discover already-enrolled pools
+## 2. Deploy first, enroll pools later
 
-Keep `auto_discover_pools = true` and leave the advanced `pools` map empty for the
-default path. During **Plan**, Terraform lists only the selected
-`pool_compartment_ocid` and discovers nonterminal pools in the selected existing
-`HarnessId` group. If exactly one nonempty group is present, `scope_id` can stay
-blank and Terraform infers it. If several groups are present, enter the group's
-existing `HarnessId` value in `scope_id`; this optional input is not a live OCI
-selector. A compartment with no enrolled group needs enrollment preparation by
-its pool owner before discovery can succeed.
+### First deployment: standby
+
+Leave **Enroll existing pools now** unchecked (`enroll_pools = false`) and the
+advanced `pools` map empty. `pool_compartment_ocid` can remain blank. Terraform
+does not list or read any pool, and missing pool tags do not block this deployment.
+The Function, image repository, ledger and logs are created as usual. The
+controller compartment supplies the initial Function configuration's compartment
+value, but this does not enroll its pools or grant Compute permissions.
+
+If the future pools already have a chosen `HarnessId` group, set `scope_id` to
+that value before the first Apply. Otherwise Terraform generates and persists a
+`controller-<UUID>` scope. After Apply, read `controller_scope_id`; this is the
+`HarnessId` value the pools, instance configurations and launch details must use
+when they are enrolled. Keep the same scope when updating the stack: it also
+identifies the ledger and named resources. You cannot bootstrap one scope and
+later change it to an unrelated existing group.
+
+Signed controller status reports `awaiting_pool_enrollment`. Pool actions return
+application status `409` with `controller_not_enrolled` before creating OCI clients.
+Standby status is not a connectivity or resource-permission check.
+This intentional standby mode is controlled by Terraform; it does not turn an
+empty discovery result or an OCI permission failure into a successful enrollment.
+
+### Later: enroll pools in the same stack
+
+1. Read `controller_scope_id`. Have the infrastructure owner prepare the pool,
+   immutable instance configuration and launch tags using that exact scope and
+   the profile/protection contract below. This stack never creates or retags pools.
+2. Set `enroll_pools = true`, explicitly select `pool_compartment_ocid`, and set
+   `scope_id` to the saved `controller_scope_id` value. This selects the same
+   controller even when the compartment contains multiple groups. Keep
+   `auto_discover_pools = true` and the advanced `pools` map empty for discovery.
+3. Review the new Plan's exact pool IDs, capacity limits and controller IAM
+   statements. Update centrally managed IAM, or let an authorized administrator
+   apply the enabled IAM resources. Enrollment needs Compute permissions that
+   standby did not grant.
+4. Apply to the same stack. It retains the Function, ledger, controller scope
+   and other deployment resources and configures the fixed pool allowlist.
+   Keep `dry_run = true` and `enable_termination = false` for the signed checks.
+
+To enroll at initial deployment, select **Enroll existing pools now** and provide
+the pool compartment. A blank `scope_id` infers the sole nonempty `HarnessId`
+group among nonterminal pools; when several groups exist, enter the intended
+group explicitly before the first Apply. This inference applies only when
+enrollment is enabled from the start. Later enrollment must match the scope
+already persisted by the standby deployment. `scope_id` is a text input, not a
+live OCI group selector.
+
+### Discovery and capacity settings
+
+With enrollment enabled, discovery runs during **Plan**, only in the explicit
+`pool_compartment_ocid`, and selects nonterminal pools matching the persisted
+controller scope. `auto_discover_pools` defaults to true but has no effect in
+standby. A compartment without matching enrolled pools needs preparation by its
+pool owner; empty enrollment and read/permission failures remain errors.
 
 Each pool's `ScaleTestProfile` tag becomes its profile key and default
 `worker_type`. `default_pool_max_size` sets each pool's capacity ceiling and
@@ -64,15 +117,18 @@ Remove their entries to restore defaults. CLI deployments can set
 `pool_overrides` directly without setting `customize_pool_settings`. For example:
 
 ```hcl
+enroll_pools          = true
+pool_compartment_ocid = "ocid1.compartment.oc1..REPLACE_POOLS"
 auto_discover_pools   = true
-scope_id             = "" # Infer the sole existing HarnessId group.
+scope_id             = "REPLACE_WITH_SAVED_CONTROLLER_SCOPE_ID"
 default_pool_max_size = 3
 pool_overrides = {
   small = { max_size = 5, worker_type = "small-worker" }
 }
 ```
 
-The Plan fails when the group is ambiguous, selected profiles are missing,
+The Plan fails when the initial group is ambiguous, the selected scope differs
+from the persisted controller scope, no matching pools are found, selected profiles are missing,
 invalid or duplicated, or the existing configurations fail the enrollment,
 shape or protection checks. Terraform does not fix these conditions by retagging
 or changing pools. The infrastructure owner prepares the existing enrollment
@@ -92,8 +148,8 @@ not discover pools or expand its allowlist. Client input cannot expand it either
 Preserve the existing group's tags and scope when upgrading: `scope_id` also
 contributes to resource/ledger naming and ownership.
 
-After the first Apply, Terraform retains the chosen group and each profile's
-pool OCID using Terraform-state identity guards. A changed group or a replacement
+After the first Apply, Terraform retains the controller scope; after enrollment
+it retains each profile's pool OCID using Terraform-state identity guards. A changed group or a replacement
 pool under an existing profile fails the Plan. Profile guards also have
 `prevent_destroy`: removal from discovery (including tag loss or pool deletion)
 cannot silently discard an existing enrollment. Intentional retirement/removal
@@ -101,11 +157,12 @@ requires a deliberate enrollment/ledger migration and review of historical
 retirement and request records. Do not remove identity guards merely to suppress
 an error or reuse a profile's ledger history for a different pool.
 
-For explicit manual enrollment on a new stack, set `auto_discover_pools = false`
+For explicit manual enrollment on a new stack, set `enroll_pools = true`,
+select `pool_compartment_ocid`, set `auto_discover_pools = false`,
 and use the advanced `pools` map with the profile key, exact `pool_id`,
 `worker_type` and approved `max_size`; set `scope_id` to the existing group.
-A nonempty legacy `pools` map always takes precedence over discovery, including
-on upgraded stacks that have not set the new boolean. Manual enrollment still
+A nonempty legacy `pools` map always takes precedence over standby and discovery,
+including on upgraded stacks that have not set the new booleans. Manual enrollment still
 uses the same plan-time pool/configuration checks.
 
 Instance configurations are immutable: if the existing launch template is missing required tags or shape settings, your platform creates a replacement configuration through its normal infrastructure workflow and associates it with the staging pool. The controller does not modify operator launch templates. Verify new workers inherit tags. Audit free-form tag capacity for the two enrollment tags and protection flag. Do not silently remove unrelated operator tags.
@@ -184,6 +241,11 @@ IAM creation defaults to **off** (`create_iam_resources = false`). With that set
 
 Alternatively, an authorized tenancy administrator may set `create_iam_resources = true` to create this module's dynamic group and policies. The module does not create caller users, groups, API keys or passwords. Supply only existing approved `invoker_group_ocids`. With no configured groups it creates no caller invocation policy; an administrator can instead provide a reviewed workload-principal policy for the exact Function.
 
+Standby omits Compute permissions from the controller's IAM statements. Enabling
+pool enrollment changes those statements: review and apply the updated policy,
+including centrally managed policies when IAM creation remains off, before
+testing enrolled operations.
+
 Permissions are bounded to specified compartments, with Object Storage writes limited to this bucket and without object-list/delete authority. Runtime Compute rights are **not individually IAM-bound to each pool OCID**; the code's pinned allowlist is an additional safety boundary. The controller needs pool updates and launch dependencies for scale-out. Targeted detach/delete dependencies are added only when `enable_termination = true`; centrally managed IAM must be updated manually at that point. Custom image/network/volume placement must be reviewed rather than broadening to tenancy-wide `manage all-resources`.
 
 ## 5. Deploy dry-run and perform signed checks
@@ -213,15 +275,17 @@ include `&workingDirectory=deploy%2Freference`.
 Select the compartments, Function VCN and Function subnet from the form. The
 subnet selector is filtered by the selected network compartment and VCN. Provide
 the OCIR username/auth token for the default build, or use the optional existing
-image inputs. Leave pool discovery enabled, choose the default per-pool maximum,
-and enter `scope_id` only if the selected pool compartment has multiple enrolled
-groups. Use optional profile overrides for individual maxima or worker labels;
-the advanced manual map remains available. Review the exact discovered pool IDs
-in the Plan. The
+image inputs. Leave **Enroll existing pools now** unchecked to deploy in standby;
+the pool compartment and discovery settings are not needed yet. Set `scope_id`
+before the first Apply only if you have a chosen future group; otherwise use the
+generated `controller_scope_id` for later enrollment. When enrolling, choose the
+pool compartment and per-pool maximum, optionally customize individual profiles,
+and review the exact discovered pool IDs in the Plan. The
 dedicated Object Storage ledger bucket is created automatically; leave its
 optional name blank unless you need a reviewed fixed name. The Resource Manager
 execution identity needs permission to create the defined resources and read
-the selected subnets plus pinned pools/configurations; runtime Function IAM is
+the selected subnets; pool/configuration read permissions are needed only during
+enrollment. Runtime Function IAM is
 a separate requirement. Enter a registry token only in the sensitive
 `ocir_auth_token` input; restrict access to stack variables, state and plans.
 
@@ -245,10 +309,15 @@ terraform show reference-staging.tfplan
 terraform apply reference-staging.tfplan
 terraform output function_ocid
 terraform output invoke_endpoint
+terraform output controller_scope_id
 terraform output -json iam_review
 ```
 
 Review the saved plan: only the Function/application, dedicated ledger/lease, logs, source-build repository/build action when selected, and explicitly enabled IAM should be created. There must be **no** worker/pool/network mutation. Protect and dispose of saved plans according to operator policy.
+
+For a standby deployment, verify signed status is `awaiting_pool_enrollment`.
+Complete section 2's later-enrollment steps before the pool dry-run and cutover
+checks below.
 
 Use the accompanying integration client with the Function OCID and OCI signer. This deployment sets `CONTROLLER_ONLY=true` and `AUTH_MODE=oci_iam`: the OCI InvokeFunction front door verifies the signed caller before dispatch. The application does not trust a caller-supplied `Authorization` header as evidence of OCI identity and requires no shared demo bearer token. A signed direct invocation returns a JSON `{status_code, body}` envelope over successful Function transport; inspect the **business** `status_code`, `body.retryable`, and outcome, not just transport HTTP 200.
 

@@ -104,29 +104,58 @@ outputs:
             self.assertIn("    visible: ${build_function_image}", variable_lines(schema, name))
         self.assertIn("    type: password", variable_lines(schema, "ocir_auth_token"))
 
-    def test_normal_pool_enrollment_defaults_to_discovery_without_a_required_map(self):
+    def test_new_stack_defaults_to_standby_without_pool_inputs(self):
         schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
         self.assertEqual(group_lines(schema, "Pool enrollment"), [
-            "    variables: [auto_discover_pools, default_pool_max_size, scope_id]",
+            "    variables: [enroll_pools, pool_compartment_ocid, scope_id, auto_discover_pools, default_pool_max_size]",
         ])
+        self.assertIs(default_value(schema, "enroll_pools"), False)
         self.assertIs(default_value(schema, "auto_discover_pools"), True)
+        for name in ("pool_compartment_ocid", "auto_discover_pools"):
+            self.assertIn("    visible: ${enroll_pools}", variable_lines(schema, name))
+        self.assertIn("    required: true", variable_lines(schema, "pool_compartment_ocid"))
         self.assertEqual(default_value(schema, "default_pool_max_size"), 3)
-        self.assertIn("    visible: ${auto_discover_pools}", variable_lines(schema, "default_pool_max_size"))
+        self.assertIn('      and: ["${enroll_pools}", "${auto_discover_pools}"]',
+                      variable_lines(schema, "default_pool_max_size"))
         self.assertEqual(default_value(schema, "scope_id"), "")
         self.assertIn("    required: false", variable_lines(schema, "scope_id"))
+        terraform = (ROOT / "deploy/reference/variables.tf").read_text(encoding="utf-8")
+        for name, expected in (("enroll_pools", "false"), ("pool_compartment_ocid", '""')):
+            declaration = re.search(r'^variable "' + name + r'" \{(.*?)^\}',
+                                    terraform, re.MULTILINE | re.DOTALL)
+            self.assertIsNotNone(declaration)
+            self.assertRegex(declaration.group(1), r"(?m)^\s*default\s*=\s*" + expected + r"\s*$")
 
     def test_advanced_pool_groups_follow_mode_and_overrides_start_empty(self):
         schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
         manual = group_lines(schema, "Advanced manual enrollment")
         self.assertIn("    visible:", manual)
-        self.assertIn('      not: ["${auto_discover_pools}"]', manual)
+        self.assertIn("      and:", manual)
+        self.assertIn("        - ${enroll_pools}", manual)
+        self.assertIn('        - not: ["${auto_discover_pools}"]', manual)
         self.assertIn("    variables: [pools]", manual)
         self.assertIn("    required: true", variable_lines(schema, "pools"))
         overrides = group_lines(schema, "Advanced discovery overrides")
-        self.assertIn("    visible: ${auto_discover_pools}", overrides)
+        self.assertIn('      and: ["${enroll_pools}", "${auto_discover_pools}"]', overrides)
         self.assertIn("    variables: [customize_pool_settings, pool_overrides]", overrides)
         self.assertEqual(default_value(schema, "pool_overrides"), {})
         self.assertIn("    required: false", variable_lines(schema, "pool_overrides"))
+
+    def test_root_wires_explicit_empty_mode_without_discovery_or_compute_grants(self):
+        enrollment = (ROOT / "deploy/reference/enrollment.tf").read_text(encoding="utf-8")
+        self.assertRegex(enrollment, r"enrollment_requested\s*=\s*var\.enroll_pools \|\| length\(var\.pools\) > 0")
+        self.assertRegex(enrollment, r"count\s*=\s*local\.enrollment_requested && var\.auto_discover_pools && length\(var\.pools\) == 0 \? 1 : 0")
+        self.assertRegex(enrollment, r"enroll_pools\s*=\s*var\.enroll_pools")
+        self.assertRegex(enrollment, r'target_pool_compartment_id\s*=\s*var\.pool_compartment_ocid != "" \? var\.pool_compartment_ocid : var\.controller_compartment_ocid')
+        main = (ROOT / "deploy/reference/main.tf").read_text(encoding="utf-8")
+        self.assertRegex(main, r"ALLOW_EMPTY_POOL_REGISTRY\s*=\s*tostring\(!local\.enrollment_requested\)")
+        self.assertRegex(main, r"COMPARTMENT_OCID\s*=\s*local\.target_pool_compartment_id")
+        policy = main.split("controller_policy_statements = concat([", 1)[1].split("\n  )", 1)[0]
+        ledger_only, compute = policy.split("local.enrollment_requested ? [", 1)
+        self.assertIn("objects", ledger_only)
+        self.assertNotIn("instance-pools", ledger_only)
+        self.assertIn("instance-pools", compute)
+        self.assertIn("local.enrollment_requested && var.enable_termination ? [", compute)
 
     def test_pool_customization_toggle_hides_editor_without_disabling_saved_overrides(self):
         schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")

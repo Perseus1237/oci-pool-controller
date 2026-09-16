@@ -5,23 +5,27 @@ description: Unsupported reference implementation for existing OCI instance pool
 informationalText: >-
   Apply creates a private OCIR repository, builds the included Function source,
   and deploys it. No prebuilt image is required. Supply registry authentication
-  below. Existing worker pools and networking are required; this stack does not
-  create or retag them. Plan discovers tagged pools in the selected compartment;
-  review the exact enrollment and limits before Apply. Start with dry-run enabled
-  and termination disabled.
+  below. By default the Function deploys without pools and awaits enrollment.
+  Existing Function networking is required. Enable Enroll existing pools now
+  only when prepared pools exist; review the discovered IDs and limits in Plan.
+  This stack never creates or retags workers. Start with dry-run enabled and
+  termination disabled.
 variableGroups:
   - title: Existing infrastructure
-    variables: [region, tenancy_ocid, controller_compartment_ocid, pool_compartment_ocid, network_compartment_ocid, function_vcn_ocid, registry_compartment_ocid, subnet_ids]
+    variables: [region, tenancy_ocid, controller_compartment_ocid, network_compartment_ocid, function_vcn_ocid, registry_compartment_ocid, subnet_ids]
   - title: Function deployment
     variables: [build_function_image, ocir_username, ocir_auth_token, function_image, function_image_digest, function_shape]
   - title: Pool enrollment
-    variables: [auto_discover_pools, default_pool_max_size, scope_id]
+    variables: [enroll_pools, pool_compartment_ocid, scope_id, auto_discover_pools, default_pool_max_size]
   - title: Advanced manual enrollment
     visible:
-      not: ["${auto_discover_pools}"]
+      and:
+        - ${enroll_pools}
+        - not: ["${auto_discover_pools}"]
     variables: [pools]
   - title: Advanced discovery overrides
-    visible: ${auto_discover_pools}
+    visible:
+      and: ["${enroll_pools}", "${auto_discover_pools}"]
     variables: [customize_pool_settings, pool_overrides]
   - title: Safety and capacity
     variables: [dry_run, enable_termination, max_profiles, max_pool_size, max_active_pools, max_total_ocpus]
@@ -43,6 +47,7 @@ variables:
   pool_compartment_ocid:
     type: oci:identity:compartment:id
     required: true
+    visible: ${enroll_pools}
     title: Existing pool compartment
   network_compartment_ocid:
     type: oci:identity:compartment:id
@@ -107,23 +112,30 @@ variables:
     visible:
       not: ["${build_function_image}"]
     title: Function architecture (must match image)
+  enroll_pools:
+    type: boolean
+    default: false
+    title: Enroll existing pools now
+    description: Leave unchecked to deploy the Function now and enroll later. Existing saved manual allowlists remain active; existing discovery stacks must check this when upgrading. No pool is created automatically.
   auto_discover_pools:
     type: boolean
     default: true
+    visible: ${enroll_pools}
     title: Discover enrolled pools automatically
     description: Reads existing HarnessId and ScaleTestProfile tags in the pool compartment during Plan. A saved nonempty manual allowlist remains authoritative; disable discovery to view or enter it.
   default_pool_max_size:
     type: number
     default: 3
-    visible: ${auto_discover_pools}
+    visible:
+      and: ["${enroll_pools}", "${auto_discover_pools}"]
     title: Maximum workers per discovered pool
     description: Approved size limit for every discovered pool unless overridden below.
   scope_id:
     type: string
     required: false
     default: ""
-    title: Controller group (optional for discovery)
-    description: Existing HarnessId tag. Leave blank to infer the only enrolled group; enter a value when multiple groups exist. Required for manual enrollment.
+    title: Controller group (optional)
+    description: Deploy-only mode generates a stable group when blank; use output controller_scope_id as HarnessId for later pools. Initial discovery can infer a sole existing group. Set a planned group now if known; it cannot change after Apply.
   pools:
     type: map
     valueType: pool_entry
@@ -227,6 +239,9 @@ variables:
       This stack creates a dedicated private, versioned ledger bucket. Leave
       blank to use the generated name; do not provide an existing shared bucket.
 outputs:
+  controller_scope_id:
+    type: string
+    title: Stable controller group (HarnessId for later enrollment)
   function_image:
     type: string
     title: Deployed Function image

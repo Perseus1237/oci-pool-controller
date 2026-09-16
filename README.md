@@ -19,10 +19,11 @@ complete Terraform working-directory path in that GitHub archive is exactly
 Terraform configuration and `schema.yaml`; it is why Resource Manager renders
 the deployment inputs instead of treating the repository root as a stack.
 
-The form asks for the controller, pool, network, and OCIR compartments; the
-Function VCN and subnet; an OCIR username and auth token; pool-discovery and
-capacity settings; IAM options; and the optional dedicated Object Storage
-ledger-bucket name. During **Apply**, the stack creates a private OCIR repository,
+The form asks for the controller, network, and OCIR compartments; the Function
+VCN and subnet; an OCIR username and auth token; IAM options; and the optional
+dedicated Object Storage ledger-bucket name. Leave **Enroll existing pools now**
+unchecked to deploy the Function first. No existing pool or enrollment tags are
+required for this default. During **Apply**, the stack creates a private OCIR repository,
 builds the included Function source, pushes its image, and deploys the Function.
 You do not need to build an image or create a repository before clicking the
 button. Opening the button only opens the form; it does not deploy resources.
@@ -45,8 +46,9 @@ Keep your existing scheduler, demand calculation and worker runtime. Replace
 the pool's existing capacity writer with OCI IAM-signed direct Function calls
 from your control plane, hosted in OCI, another cloud or your own environment.
 Run a durable retry/maintenance loop at your chosen interval. The deployment
-stack references existing pools and networking and creates the controller,
-private image repository, ledger/logging and optionally reviewed IAM.
+stack uses existing networking and creates the controller, private image
+repository, ledger/logging and optionally reviewed IAM. You can deploy the
+Function before preparing pools, then enroll existing pools in the same stack.
 
 Read these guides in order:
 
@@ -127,6 +129,33 @@ information** page, explicitly select Terraform **1.5.x** before selecting
 **Next**. The module constrains Terraform to Resource Manager's supported
 1.5.x runtime (CLI 1.5.7); selecting a blank or retired version causes the
 `Invalid Terraform version` error.
+
+### Deploy first, enroll pools later
+
+The default `enroll_pools = false` deploys the Function in standby. It does not
+list or read pools or require a pool compartment. Signed status reports
+`awaiting_pool_enrollment`; pool actions return application status `409` with
+`controller_not_enrolled` before creating OCI clients. Standby IAM grants no Compute
+permissions.
+
+If you know the future pools' existing `HarnessId` group, enter that value in
+`scope_id` before the first Apply. Otherwise Terraform generates and persists a
+`controller-<UUID>` scope. Save the `controller_scope_id` output: later pools,
+their instance configurations and launch details must use that value for their
+`HarnessId` tags. The scope identifies this controller and ledger and cannot be
+changed later to select an unrelated group.
+
+When the pools are ready, update the same stack: select **Enroll existing pools
+now**, select their compartment, set `scope_id` to the saved
+`controller_scope_id`, and review the discovered pool IDs and IAM changes in a
+new Plan before Apply. The Function, ledger and controller scope
+are retained. The stack never creates or retags pools. See the
+[enrollment steps](deploy/reference/README.md#2-deploy-first-enroll-pools-later).
+
+You can also enable enrollment on the very first deployment. In that case a
+blank `scope_id` infers the sole existing `HarnessId` group in the selected pool
+compartment; when there are multiple groups, enter the intended group explicitly.
+That initial choice is then preserved for subsequent deployments.
 
 ### Build and deploy the Function in Resource Manager
 
@@ -210,19 +239,18 @@ working directory is **`deploy/reference`** (without the GitHub archive-root
 prefix). This directory contains the Terraform files and `schema.yaml` that
 render the deployment form. The form uses OCI selectors for compartments, the
 Function VCN and Function subnets, with subnets filtered to the selected VCN.
-Pool discovery is enabled by default: during Plan, Terraform finds pools in the
-selected pool compartment with an existing `HarnessId` group and uses their
-`ScaleTestProfile` tags as profile keys. If that compartment contains exactly
-one nonempty group among nonterminal pools, leave the optional group (`scope_id`)
-blank; otherwise enter the existing group to deploy. This field is not a live
-group selector. The default maximum is three instances per pool, independently
-of its current size; adjust `default_pool_max_size` or optional profile overrides
-for your approved capacity. Terraform reads each selected pool/configuration to
-verify enrollment and derive its name, shape, OCPUs and memory. The dedicated Object Storage ledger bucket
+Pool enrollment is optional at deployment. When enabled, discovery runs during
+Plan in the explicitly selected pool compartment, using the controller's
+`HarnessId` scope and the pools' `ScaleTestProfile` tags. The default maximum is
+three instances per pool, independently of its current size; adjust
+`default_pool_max_size` or optional profile overrides for your approved capacity.
+Terraform verifies the selected pools/configurations and derives each pool's
+name, shape, OCPUs and memory. The dedicated Object Storage ledger bucket
 is created automatically. The full source `.tar.gz` is for review, not Resource
 Manager. Follow the [deployment guide](deploy/reference/README.md) first:
-existing pools/networking, an OCIR username/auth token for the default build,
-IAM permissions, and deployment variables are still required. The generic
+existing networking, an OCIR username/auth token for the default build, IAM
+permissions, and deployment variables are still required. Existing pools are
+required only when enrollment is enabled. The generic
 package supports the same source-build path as the public GitHub button.
 
 To host a version-pinned package privately, use an approved read-only,
@@ -241,8 +269,8 @@ and review a plan before applying. Keep `dry_run = true` and
 `enable_termination = false` for initial validation. A deploy button does not
 replace release approval or the staging checks in the runbook.
 
-Discovery also preserves the controller group and each profile-to-pool binding
-after the first Apply. A changed group, replacement pool under an old profile,
+Terraform preserves the controller scope after the first Apply and each
+profile-to-pool binding after enrollment. A changed group, replacement pool under an old profile,
 or removal of an enrolled profile is blocked. Retiring an enrollment requires
 a deliberate ledger/enrollment migration; losing tags must not silently discard
 controller history.
@@ -274,9 +302,12 @@ resource naming, pool keys/OCIDs, scope ID and ledger ownership where needed;
 changing defaults can rename or replace resources. Never reset retirement
 records or generation counters to adopt the new naming. See the
 [deployment guide](deploy/reference/README.md) before migration.
-Existing nonempty `pools` maps take precedence over automatic discovery, so an
-older stack keeps its explicit allowlist. For a new manually configured stack,
-disable `auto_discover_pools` and use the advanced `pools` map.
+Existing nonempty `pools` maps take precedence over `enroll_pools = false` and
+automatic discovery, so an older stack keeps its explicit allowlist. Existing
+discovery-based stacks must set `enroll_pools = true` when upgrading; identity
+guards block removal of their existing enrollments. For a new manually
+configured stack, enable enrollment, disable `auto_discover_pools`, and use the
+advanced `pools` map.
 
 The source still supports only its documented Intel Flex profiles. Generic
 naming does not add support for arbitrary shapes, regions, scheduler products

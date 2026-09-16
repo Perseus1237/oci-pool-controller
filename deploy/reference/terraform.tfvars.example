@@ -3,7 +3,7 @@
 region                       = "us-ashburn-1"
 tenancy_ocid                 = "ocid1.tenancy.oc1..REPLACE_ME"
 controller_compartment_ocid  = "ocid1.compartment.oc1..REPLACE_CONTROLLER"
-pool_compartment_ocid        = "ocid1.compartment.oc1..REPLACE_POOLS"
+pool_compartment_ocid        = "" # Optional in standby; explicitly select for enrollment.
 network_compartment_ocid     = "ocid1.compartment.oc1..REPLACE_NETWORK"
 function_vcn_ocid            = "ocid1.vcn.oc1.iad.REPLACE_FUNCTION_VCN"
 registry_compartment_ocid    = "ocid1.compartment.oc1..REPLACE_REGISTRY"
@@ -23,12 +23,20 @@ enable_termination    = false
 create_iam_resources  = false
 invoker_group_ocids   = ["ocid1.group.oc1..REPLACE_APPROVED_CALLER_GROUP"]
 
-# Discover the existing tagged pools in the selected pool compartment during Plan.
-# Leave scope_id blank only when exactly one existing HarnessId group is present.
-# If there are multiple groups, enter the existing HarnessId value to select one.
-# This stack does not create, resize or retag pools. Review every Plan's exact IDs.
-auto_discover_pools   = true
+# Deploy the Function first without listing/reading pools or requiring pool tags.
+enroll_pools          = false
+# Set a known future HarnessId group before the first Apply, or leave blank for
+# a persisted controller-UUID. Read controller_scope_id after Apply and use that
+# value on later pool/configuration/launch HarnessId tags. Do not change scope.
+# If enrolling on the FIRST deployment instead, blank scope_id can infer the
+# sole existing HarnessId group; set it explicitly if multiple groups exist.
 scope_id             = ""
+# Later: set enroll_pools=true and pool_compartment_ocid to the existing pool
+# compartment, set scope_id to controller_scope_id and prepare matching tags,
+# then review Plan/IAM
+# changes and Apply the same stack. No pool is ever created, resized or retagged.
+# Discovery is active only when enrollment is enabled.
+auto_discover_pools   = true
 default_pool_max_size = 3 # Approved ceiling per pool, not its current/desired size.
 
 # Optional overrides keyed by an existing ScaleTestProfile tag. Without an
@@ -46,9 +54,11 @@ max_active_pools   = 1
 max_total_ocpus    = 16
 
 # Optional advanced manual enrollment. A nonempty pools map takes precedence
-# over discovery, preserving existing stacks. For a new manual stack, set:
+# over standby/discovery, preserving existing stacks. For a new manual stack, set:
+# enroll_pools        = true
+# pool_compartment_ocid = "ocid1.compartment.oc1..REPLACE_POOLS"
 # auto_discover_pools = false
-# scope_id           = "REPLACE_WITH_EXISTING_HARNESS_ID"
+# Use the persisted controller_scope_id, or set a group's scope_id BEFORE first Apply.
 # pools = {
 #   small = {
 #     pool_id     = "ocid1.instancepool.oc1.iad.REPLACE_POOL"

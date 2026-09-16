@@ -186,6 +186,7 @@ class Config:
     auth_mode: str = "bearer"
     max_profiles: int = MAX_SCALE_TEST_PROFILES
     max_instances_per_profile: int = HARD_MAX_SCALE_TEST_POOL_SIZE
+    allow_empty_pool_registry: bool = False
 
 
 @dataclass(frozen=True)
@@ -729,6 +730,9 @@ def _config(environ: Mapping[str, str]) -> Config:
     harness_token = environ.get("HARNESS_TOKEN", "")
     function_role = environ.get("FUNCTION_ROLE", "")
     controller_only = _parse_bool(environ.get("CONTROLLER_ONLY"), "CONTROLLER_ONLY", default=False)
+    allow_empty_pool_registry = _parse_bool(
+        environ.get("ALLOW_EMPTY_POOL_REGISTRY"), "ALLOW_EMPTY_POOL_REGISTRY", default=False,
+    )
     auth_mode = environ.get("AUTH_MODE", "bearer")
     if auth_mode not in {"bearer", "oci_iam"} or (
         auth_mode == "oci_iam" and (not controller_only or function_role != "control")
@@ -736,6 +740,8 @@ def _config(environ: Mapping[str, str]) -> Config:
         raise HarnessError(500, "invalid_configuration", "oci_iam requires CONTROLLER_ONLY=true and FUNCTION_ROLE=control")
     if controller_only and function_role != "control":
         raise HarnessError(500, "invalid_configuration", "controller-only deployments require the control role")
+    if allow_empty_pool_registry and (not controller_only or auth_mode != "oci_iam"):
+        raise HarnessError(500, "invalid_configuration", "ALLOW_EMPTY_POOL_REGISTRY requires controller-only OCI IAM authentication")
     missing = [
         name
         for name, value in (
@@ -829,12 +835,15 @@ def _config(environ: Mapping[str, str]) -> Config:
         max_instances = _parse_nonnegative_int(environ.get("CONTROLLER_MAX_POOL_SIZE", max_instances), "CONTROLLER_MAX_POOL_SIZE")
         if min(max_profiles, max_instances) < 1 or not ledger_namespace:
             raise HarnessError(500, "invalid_configuration", "controller-only mode requires positive ceilings and a durable ledger")
+    raw_profiles = environ.get("SCALE_TEST_PROFILES_JSON")
+    if allow_empty_pool_registry and (not isinstance(raw_profiles, str) or not raw_profiles.strip()):
+        raise HarnessError(500, "invalid_configuration", "ALLOW_EMPTY_POOL_REGISTRY requires explicit SCALE_TEST_PROFILES_JSON; use {} for no enrolled pools")
     profiles = _parse_scale_test_profiles(
-        environ.get("SCALE_TEST_PROFILES_JSON"), max_profiles=max_profiles,
+        raw_profiles, max_profiles=max_profiles,
         max_pool_size=max_instances, require_pool_ids=controller_only,
     )
     budget_enabled = _parse_bool(environ.get("SCALE_TEST_BUDGET_LIMITS_ENABLED"), "SCALE_TEST_BUDGET_LIMITS_ENABLED", default=True)
-    if controller_only and (not profiles or not budget_enabled):
+    if controller_only and (not budget_enabled or (not profiles and not allow_empty_pool_registry)):
         raise HarnessError(500, "invalid_configuration", "controller-only mode requires registered pools and enabled capacity guards")
 
     return Config(
@@ -863,6 +872,7 @@ def _config(environ: Mapping[str, str]) -> Config:
         auth_mode=auth_mode,
         max_profiles=max_profiles,
         max_instances_per_profile=max_instances,
+        allow_empty_pool_registry=allow_empty_pool_registry,
     )
 
 
@@ -1509,6 +1519,41 @@ def _latest_desired_generation(
     if isinstance(generation, bool) or not isinstance(generation, int) or generation < 1:
         return 0
     return generation
+
+
+def _awaiting_pool_enrollment_status(config: Config, now: datetime) -> tuple[int, Mapping[str, Any]]:
+    """Report a deliberately empty controller without contacting OCI services."""
+
+    message = "The controller is deployed with no enrolled pools. Enroll pools and update the Function configuration before requesting pool operations."
+    return 200, {
+        "result": "awaiting_pool_enrollment",
+        "action": "scale_test_status",
+        "serverTime": _timestamp(now),
+        "message": message,
+        "enrolledPoolCount": 0,
+        "configurationMatches": False,
+        "configurationMessage": message,
+        "profiles": [],
+        "reconcilePools": [],
+        "workerSelfReclaim": {
+            "enabled": False,
+            "scope": "contrast_pool_only",
+            "status": "DISABLED",
+            "detail": "Worker self-reclaim is disabled for controller-only deployments.",
+        },
+        "safety": {
+            "dryRun": config.dry_run,
+            "budgetLimitsEnabled": config.scale_test_budget_limits_enabled,
+            "maxProfiles": config.max_profiles,
+            "maxInstancesPerProfile": config.max_instances_per_profile,
+            "maxActiveProfiles": config.max_active_scale_test_profiles,
+            "activeProfiles": 0,
+            "maxTotalOcpus": config.max_scale_test_total_ocpus,
+            "totalDesiredOcpus": 0,
+            "totalEffectiveOcpus": 0,
+            "queuePersistence": "object_storage_request_ledger",
+        },
+    }
 
 
 def _scale_test_status(config: Config, clients: Clients, now: datetime) -> tuple[int, Mapping[str, Any]]:
@@ -3742,7 +3787,14 @@ def handle_request(
         _authorize_role(action, config)
         _authenticate(action, payload, headers or {}, config)
         now = _utcnow(clock)
-        if action == "simulate_scale_burst":
+        if config.controller_only and config.allow_empty_pool_registry and not config.scale_test_profiles:
+            if action != "scale_test_status":
+                raise HarnessError(
+                    409, "controller_not_enrolled",
+                    "No pools are enrolled. Enroll pools and update the Function configuration before requesting pool operations.",
+                )
+            result = _awaiting_pool_enrollment_status(config, now)
+        elif action == "simulate_scale_burst":
             result = _simulate_scale_burst(payload, config)
         else:
             active_clients = clients if clients is not None else _make_clients()
