@@ -28,6 +28,11 @@ builds the included Function source, pushes its image, and deploys the Function.
 You do not need to build an image or create a repository before clicking the
 button. Opening the button only opens the form; it does not deploy resources.
 
+**Configure caller groups** is optional and unchecked by default. Blank group
+rows are ignored; saved real group OCIDs still apply when the editor is hidden.
+An empty group list grants no invocation access. Configure approved caller IAM
+before invoking the Function; see the [IAM guide](deploy/reference/README.md#4-review-configuration-and-iam).
+
 ## Sample Code Disclaimer
 
 **Unsupported sample code—not an Oracle-supported product or service.**

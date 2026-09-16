@@ -1,5 +1,5 @@
 schemaVersion: 1.1.0
-version: "20260915"
+version: "20260916"
 title: OCI Pool Controller Reference Implementation
 description: Unsupported reference implementation for existing OCI instance pools.
 informationalText: >-
@@ -30,7 +30,7 @@ variableGroups:
   - title: Safety and capacity
     variables: [dry_run, enable_termination, max_profiles, max_pool_size, max_active_pools, max_total_ocpus]
   - title: IAM and resource naming
-    variables: [create_iam_resources, invoker_group_ocids, name_prefix, dynamic_group_name, ledger_bucket_name]
+    variables: [create_iam_resources, configure_caller_groups, invoker_group_ocids, name_prefix, dynamic_group_name, ledger_bucket_name]
 variables:
   region:
     type: oci:identity:region:name
@@ -202,10 +202,19 @@ variables:
     type: boolean
     default: false
     title: Create reviewed IAM policies and dynamic group
+  configure_caller_groups:
+    type: boolean
+    default: false
+    title: Configure caller groups
+    description: Show optional existing IAM group OCIDs permitted to invoke this Function. Hiding the editor does not disable saved groups; remove their entries to revoke stack-managed grants.
   invoker_group_ocids:
     type: list
     valueType: invoker_group_item
+    required: false
+    default: []
+    visible: ${configure_caller_groups}
     title: Existing approved invoking group OCIDs
+    description: Optional. Enter existing IAM group OCIDs beginning ocid1.group., not names, users or dynamic groups. Blank rows are ignored. Leave empty to configure caller permissions later; this does not make the Function public.
   invoker_group_item:
     type: string
     visible: false

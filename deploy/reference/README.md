@@ -241,6 +241,23 @@ IAM creation defaults to **off** (`create_iam_resources = false`). With that set
 
 Alternatively, an authorized tenancy administrator may set `create_iam_resources = true` to create this module's dynamic group and policies. The module does not create caller users, groups, API keys or passwords. Supply only existing approved `invoker_group_ocids`. With no configured groups it creates no caller invocation policy; an administrator can instead provide a reviewed workload-principal policy for the exact Function.
 
+**Configure caller groups** is unchecked by default and only controls whether
+the optional group editor is visible. Leave it unchecked to deploy first and
+configure caller permissions later. Saved group OCIDs remain active when the
+editor is hidden; clear their entries and review the Plan to remove stack-managed
+grants. CLI users can set `invoker_group_ocids` without enabling this display toggle.
+Blank, whitespace-only and null rows are ignored, including blank rows recreated
+by Resource Manager. Surrounding whitespace is trimmed and duplicate OCIDs are
+collapsed. Every nonblank value must still be an IAM group OCID beginning
+`ocid1.group.`, not a group name, user, compartment or dynamic-group OCID.
+An empty list creates no caller policy and does not permit unauthenticated invocation.
+
+For an existing Resource Manager stack showing the old group validation error,
+update that stack's Terraform configuration from the revised repository/package
+and run a new Plan. Publishing to GitHub does not update an existing stack's
+uploaded configuration. Retain the stack's existing state and deployment inputs;
+do not recreate the stack to resolve an empty input row.
+
 Standby omits Compute permissions from the controller's IAM statements. Enabling
 pool enrollment changes those statements: review and apply the updated policy,
 including centrally managed policies when IAM creation remains off, before

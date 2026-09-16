@@ -28,10 +28,13 @@ data "oci_core_instance_configuration" "enrolled" {
 }
 
 locals {
-  suffix             = substr(sha256("${var.controller_compartment_ocid}:${module.enrollment.scope_id}"), 0, 8)
-  dynamic_group_name = coalesce(var.dynamic_group_name, "${var.name_prefix}-${local.suffix}")
-  ledger_bucket_name = coalesce(var.ledger_bucket_name, "${var.name_prefix}-ledger-${local.suffix}")
-  tags               = { ManagedBy = "terraform", ControllerScope = module.enrollment.scope_id }
+  # Resource Manager can recreate empty optional list rows. Normalize once for
+  # both policy statements and resource count; hiding the editor preserves grants.
+  effective_invoker_group_ocids = toset(compact([for id in var.invoker_group_ocids : trimspace(id) if id != null]))
+  suffix                        = substr(sha256("${var.controller_compartment_ocid}:${module.enrollment.scope_id}"), 0, 8)
+  dynamic_group_name            = coalesce(var.dynamic_group_name, "${var.name_prefix}-${local.suffix}")
+  ledger_bucket_name            = coalesce(var.ledger_bucket_name, "${var.name_prefix}-ledger-${local.suffix}")
+  tags                          = { ManagedBy = "terraform", ControllerScope = module.enrollment.scope_id }
   function_subnets_valid = alltrue([
     for subnet in data.oci_core_subnet.function :
     subnet.compartment_id == var.network_compartment_ocid && subnet.vcn_id == var.function_vcn_ocid
@@ -99,7 +102,7 @@ locals {
     "Allow dynamic-group ${local.dynamic_group_name} to manage volume-attachments in compartment id ${var.pool_compartment_ocid} where request.permission = 'VOLUME_ATTACHMENT_DELETE'",
   ] : [])
   invoker_policy_statements = flatten([
-    for group in sort(tolist(var.invoker_group_ocids)) : [
+    for group in sort(tolist(local.effective_invoker_group_ocids)) : [
       "Allow group id ${group} to read fn-function in compartment id ${var.controller_compartment_ocid} where target.function.id = '${oci_functions_function.controller.id}'",
       "Allow group id ${group} to use fn-invocation in compartment id ${var.controller_compartment_ocid} where target.function.id = '${oci_functions_function.controller.id}'",
     ]
@@ -241,7 +244,7 @@ resource "oci_identity_policy" "controller" {
 }
 
 resource "oci_identity_policy" "invokers" {
-  count          = var.create_iam_resources && length(var.invoker_group_ocids) > 0 ? 1 : 0
+  count          = var.create_iam_resources && length(local.effective_invoker_group_ocids) > 0 ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = "${var.name_prefix}-invoke-${local.suffix}"
   description    = "Existing operator groups may invoke this controller Function only"

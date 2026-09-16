@@ -21,7 +21,10 @@ ocir_username               = "Default/REPLACE_USERNAME"
 dry_run               = true
 enable_termination    = false
 create_iam_resources  = false
-invoker_group_ocids   = ["ocid1.group.oc1..REPLACE_APPROVED_CALLER_GROUP"]
+invoker_group_ocids   = [] # Optional; configure approved caller permissions before invoking.
+# The Console's Configure caller groups toggle only shows/hides the editor.
+# CLI users can set real group OCIDs directly, without enabling the toggle:
+# invoker_group_ocids = ["ocid1.group.oc1..REPLACE_APPROVED_CALLER_GROUP"]
 
 # Deploy the Function first without listing/reading pools or requiring pool tags.
 enroll_pools          = false

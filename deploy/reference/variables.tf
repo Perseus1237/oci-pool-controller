@@ -266,14 +266,21 @@ variable "dynamic_group_name" {
   }
 }
 
+variable "configure_caller_groups" {
+  description = "Resource Manager display control only: show optional caller-group inputs. Hiding the editor does not disable saved group OCIDs; remove them to revoke stack-managed caller grants."
+  type        = bool
+  default     = false
+}
+
 variable "invoker_group_ocids" {
-  description = "Existing OCI groups permitted to invoke this exact Function. These callers have full controller authority."
+  description = "Optional existing OCI groups permitted to invoke this exact Function. These callers have full controller authority. Blank rows are ignored; every nonblank entry must be a group OCID."
   type        = set(string)
   default     = []
+  nullable    = false
 
   validation {
-    condition     = alltrue([for id in var.invoker_group_ocids : can(regex("^ocid1.group.[A-Za-z0-9._-]+$", id))])
-    error_message = "invoker_group_ocids must contain OCI group OCIDs."
+    condition     = alltrue([for id in var.invoker_group_ocids : id == null ? true : (trimspace(id) == "" || can(regex("^ocid1[.]group[.][A-Za-z0-9._-]+$", trimspace(id))))])
+    error_message = "Every nonblank invoker_group_ocids entry must be an OCI group OCID beginning ocid1.group.; group names, user OCIDs and dynamic-group OCIDs are not accepted. Leave the list empty to configure caller permissions later."
   }
 }
 

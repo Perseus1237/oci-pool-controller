@@ -175,6 +175,20 @@ outputs:
         for source in (ROOT / "deploy/reference/modules/enrollment").glob("*.tf"):
             self.assertNotIn("customize_pool_settings", source.read_text(encoding="utf-8"))
 
+    def test_caller_group_editor_is_optional_and_hidden_by_default(self):
+        schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
+        self.assertIs(default_value(schema, "configure_caller_groups"), False)
+        self.assertIn("    title: Configure caller groups", variable_lines(schema, "configure_caller_groups"))
+        self.assertEqual(default_value(schema, "invoker_group_ocids"), [])
+        self.assertIn("    required: false", variable_lines(schema, "invoker_group_ocids"))
+        self.assertIn("    visible: ${configure_caller_groups}", variable_lines(schema, "invoker_group_ocids"))
+        main = (ROOT / "deploy/reference/main.tf").read_text(encoding="utf-8")
+        # The display toggle must not disable legacy grants or allow malformed IDs.
+        self.assertNotIn("configure_caller_groups", main)
+        self.assertEqual(main.count("var.invoker_group_ocids"), 1)
+        self.assertIn("for group in sort(tolist(local.effective_invoker_group_ocids))", main)
+        self.assertIn("var.create_iam_resources && length(local.effective_invoker_group_ocids) > 0 ? 1 : 0", main)
+
     def test_form_variables_match_terraform_and_override_attributes_remain_optional(self):
         schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
         terraform = (ROOT / "deploy/reference/variables.tf").read_text(encoding="utf-8")
