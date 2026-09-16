@@ -21,9 +21,9 @@
       "sha256": "6313a8ab2bd9e02e81493d7e12443ee7e408e33aed9df892877079b7a7b9a1fa"
     },
     {
-      "bytes": 30879,
+      "bytes": 31783,
       "path": "deploy/reference/README.md",
-      "sha256": "1ac3b644b3cb1e110aa14f7a72fa5e3e72d8ba0d3a52da39e107e4282f844862"
+      "sha256": "deaff7478bb2a329ab569fb60b8dfc9d1757000355c79f960265b418da0fd691"
     },
     {
       "path": "deploy/reference/schema.yaml",
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 21068,
+      "bytes": 21406,
       "path": "README.md",
-      "sha256": "5cd458a66a0af549da2a28c13b99421e3b3ed70751673cc97dad2f9ed6710660"
+      "sha256": "e46646261358b7dace7673f52d23d67475a69dc396c340af6c7865a78afcd2f9"
     },
     {
       "bytes": 2889,
@@ -122,8 +122,8 @@
     },
     {
       "path": "deploy/reference/image.tf",
-      "bytes": 2821,
-      "sha256": "d6e06ac0fe7d9d45e8cb5bdb78173b2ae82e503530ffcad1d77b6170867f4b63"
+      "bytes": 2945,
+      "sha256": "b7384799961388c207505778b744e40701bbf0b74f22a22edb1ba425f3ddd597"
     },
     {
       "path": "deploy/reference/build_function_image.py",
@@ -137,8 +137,8 @@
     },
     {
       "path": "tests/test_resource_manager_deployment.py",
-      "bytes": 14780,
-      "sha256": "7de7644f622069b8c429c58405f025fa086f196f74da1bf41e7913d6743c31cd"
+      "bytes": 16403,
+      "sha256": "5e9f9fe1ea2d873d9b9d1eaac89927fa77951b325aa2da910688c742dac03950"
     },
     {
       "path": "deploy/reference/enrollment.tf",

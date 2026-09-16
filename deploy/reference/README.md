@@ -1,6 +1,6 @@
 # Existing-pool reference deployment
 
-This staging module deploys the **0.12.0-rc.6 controller reference package**, not the demo tenancy. It creates one OCI Function/application, a dedicated private versioned Object Storage ledger, the initial aggregate lease object, invocation logging, and optionally narrowly scoped IAM resources. By default it also creates a private immutable OCIR repository, builds the included Function source, and pushes the image during Apply. It does **not** create, import, resize or retag any instance pool, worker, instance configuration or network, or create an API Gateway, UI, worker terminator or readiness Function.
+This staging module deploys the **0.12.0-rc.6 controller reference package**, not the demo tenancy. It creates one OCI Function/application, a dedicated private versioned Object Storage ledger, the initial aggregate lease object, invocation logging, and optionally narrowly scoped IAM resources. By default it also creates a private OCIR repository, builds the included Function source, and pushes the image during Apply. It does **not** create, import, resize or retag any instance pool, worker, instance configuration or network, or create an API Gateway, UI, worker terminator or readiness Function.
 
 New stacks deploy the Function in standby by default. Existing pools and
 enrollment tags are not prerequisites for that first deployment; enroll pools
@@ -180,7 +180,7 @@ Object Storage namespace to form the registry login. Provide
 section. This is an OCI auth token, not your account password.
 [Oracle's token instructions](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
 
-During Apply, the stack creates an immutable private OCIR repository in
+During Apply, the stack creates a private OCIR repository in
 `registry_compartment_ocid`, builds the included `function/Dockerfile` for
 `linux/amd64`, pushes the image, and deploys the Function as `GENERIC_X86`.
 The OCI Functions API resolves the image digest automatically. You do not enter
@@ -190,13 +190,26 @@ Resource Manager supplies the [Docker build host](https://docs.oracle.com/en-us/
 
 The build runs again when the included Function source or build helper changes.
 An unchanged configuration reuses the existing built image. Failed build retries
-receive a new tag; tags cannot overwrite a previous image. The stack-created
+receive a new tag, so this build workflow does not reuse a previous build's tag.
+Tags are not registry-enforced immutable: other authorized pushers could replace
+them, so restrict registry write access. The stack-created
 repository has `prevent_destroy` protection so changing image modes cannot
 silently delete the running Function's image. Choose the mode at stack creation;
 later mode changes require a deliberate repository-ownership migration.
 Mutable base-image tags and dependency downloads mean separate source builds
 are not guaranteed to produce identical bytes. Choose an existing pinned image
 when you need to deploy the same previously built artifact.
+
+The stack deliberately omits `is_immutable` rather than requesting repository
+immutability. OCIR can reject this optional provider field during repository
+creation with `400-BAD_REQUEST, Setting isImmutable is not currently supported`.
+This is separate from repository privacy, Terraform deletion protection and
+the Function's resolved image digest. If an existing stack failed with that
+error, update its Terraform configuration with this corrected package, retain
+its state and inputs, then review a fresh Plan before Apply. Do not delete the
+stack or previously created resources to retry; a failed Apply may have already
+created other resources. This change does not require a public repository or
+a prebuilt image, and does not change the repository's resource address/name.
 
 ### Optional: use an existing private OCIR image
 

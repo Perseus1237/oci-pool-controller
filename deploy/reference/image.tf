@@ -22,8 +22,9 @@ resource "oci_artifacts_container_repository" "function" {
   compartment_id = var.registry_compartment_ocid
   display_name   = "${lower(replace(var.name_prefix, "_", "-"))}-${local.suffix}/function"
   is_public      = false
-  is_immutable   = true
-  freeform_tags  = local.tags
+  # Do not set is_immutable: OCIR can reject this optional API property even
+  # though the provider exposes it. Privacy and deletion protection are separate.
+  freeform_tags = local.tags
 
   # The deployed Function may still reference this repository when changing
   # deployment modes. Never delete its images as a side effect of that switch.
@@ -49,7 +50,7 @@ resource "terraform_data" "function_image_build" {
   provisioner "local-exec" {
     command = "python3 \"${path.module}/build_function_image.py\""
     environment = {
-      # A fresh resource ID gives each build attempt a unique immutable tag,
+      # A fresh resource ID gives each build attempt a unique tag,
       # including retries after a failed provisioner. No shared digest files.
       POOL_IMAGE               = "${local.image_repository_url}:build-${self.id}"
       POOL_REGISTRY            = local.registry_endpoint

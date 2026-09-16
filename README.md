@@ -165,12 +165,18 @@ That initial choice is then preserved for subsequent deployments.
 ### Build and deploy the Function in Resource Manager
 
 Keep `build_function_image = true` (the default) to build from source.
-The stack creates an immutable private repository in the selected OCIR
+The stack creates a private repository in the selected OCIR
 compartment, builds `function/Dockerfile` for `linux/amd64` on the Resource Manager
 host, pushes the image, and deploys a `GENERIC_X86` Function. OCI resolves the
 image's SHA-256 digest during Function creation. The image address and digest
 are deployment outputs, not values you need to look up. The Function's
 architecture is independent of the enrolled workers' architecture.
+
+The stack omits OCIR's optional `is_immutable` setting because the service can
+reject it with `Setting isImmutable is not currently supported`. Each build
+attempt uses a unique tag, but repository-enforced tag immutability is not
+enabled; restrict registry push permissions. The repository remains private and
+protected against Terraform deletion.
 
 Select the compartments and existing Function VCN/subnets, then enter your
 **OCIR username** (for example, `Default/user`; the stack adds the tenancy

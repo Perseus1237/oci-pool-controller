@@ -104,6 +104,26 @@ outputs:
             self.assertIn("    visible: ${build_function_image}", variable_lines(schema, name))
         self.assertIn("    type: password", variable_lines(schema, "ocir_auth_token"))
 
+    def test_ocir_repository_omits_unsupported_immutability_but_stays_private_and_protected(self):
+        source = (ROOT / "deploy/reference/image.tf").read_text(encoding="utf-8")
+        repository = re.search(r'^resource "oci_artifacts_container_repository" "function" \{.*?^\}',
+                               source, re.MULTILINE | re.DOTALL).group(0)
+        # Omit the argument entirely, rather than sending a different explicit value.
+        self.assertNotRegex(repository, r"(?m)^\s*is_immutable\s*=")
+        self.assertRegex(repository, r"(?m)^\s*is_public\s*=\s*false\s*$")
+        self.assertRegex(repository, r"(?m)^\s*prevent_destroy\s*=\s*true\s*$")
+        self.assertRegex(repository, r"count\s*=\s*var\.build_function_image \? 1 : 0")
+
+    def test_source_build_keeps_unique_attempt_tags_and_function_dependency(self):
+        source = (ROOT / "deploy/reference/image.tf").read_text(encoding="utf-8")
+        self.assertIn('${local.image_repository_url}:build-${terraform_data.function_image_build[0].id}', source)
+        self.assertIn('${local.image_repository_url}:build-${self.id}', source)
+        self.assertRegex(source, r"source_hash\s*=\s*local\.function_source_hash")
+        self.assertRegex(source, r"repository_id\s*=\s*oci_artifacts_container_repository\.function\[0\]\.id")
+        main = (ROOT / "deploy/reference/main.tf").read_text(encoding="utf-8")
+        self.assertRegex(main, r"image\s*=\s*local\.effective_function_image")
+        self.assertRegex(main, r'image_digest\s*=\s*var\.build_function_image \|\| var\.function_image_digest == "" \? null : var\.function_image_digest')
+
     def test_new_stack_defaults_to_standby_without_pool_inputs(self):
         schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
         self.assertEqual(group_lines(schema, "Pool enrollment"), [
