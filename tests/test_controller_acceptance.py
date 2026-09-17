@@ -148,12 +148,152 @@ class ControllerAcceptance(unittest.TestCase):
         self.assertFalse(self.clients.pools.detach_calls)
         self.assertFalse(self.clients.compute.terminate_calls)
 
-    def test_busy_pool_does_not_receive_update(self):
+    def test_scaling_pool_with_coherent_membership_can_grow_during_retirement(self):
         self.detached(1)
         self.clients.pools.pool.lifecycle_state = "SCALING"
         _, body = self.demand(8)
+        self.assertEqual(body["outcome"], "scale_out_submitted", body)
+        self.assertEqual(body["target_size"], 8)
+        self.assertEqual(len(self.clients.pools.update_calls), 1)
+
+    def test_scaling_pool_defers_detach_after_live_api_incorrect_state(self):
+        self.assertEqual(self.protect("0", SCALE_NEWEST_INSTANCE_ID)[0], 202)
+        self.clients.pools.pool.lifecycle_state = "SCALING"
+        _, body = self.demand(2)
         self.assertEqual(body["outcome"], "pool_busy", body)
+        self.assertEqual(body["pending_reason"], "detach_requires_running")
+        self.assertFalse(self.clients.pools.detach_calls)
         self.assertFalse(self.clients.pools.update_calls)
+
+    def test_non_scaling_transitional_states_still_block_mutations(self):
+        for state in ["PROVISIONING", "STARTING", "STOPPING", "STOPPED", "TERMINATING", "TERMINATED", "UNKNOWN"]:
+            with self.subTest(state=state):
+                self.setUp()
+                self.clients.pools.pool.lifecycle_state = state
+                _, body = self.demand(8)
+                self.assertIn(body["outcome"], {"pool_busy", "pool_not_active"}, body)
+                self.assertFalse(self.clients.pools.update_calls)
+                self.assertFalse(self.clients.pools.detach_calls)
+
+    def test_scaling_membership_mismatch_still_defers_both_mutations(self):
+        for target in [2, 4]:
+            with self.subTest(target=target):
+                self.setUp()
+                self.protect("0", SCALE_NEWEST_INSTANCE_ID)
+                self.clients.pools.pool.lifecycle_state = "SCALING"
+                self.clients.pools.pool.size = target
+                _, body = self.demand(8)
+                self.assertEqual(body["outcome"], "pool_state_changed", body)
+                self.assertFalse(self.clients.pools.update_calls)
+                self.assertFalse(self.clients.pools.detach_calls)
+
+    def test_scaling_pool_still_obeys_physical_cap(self):
+        self.detached(22)
+        self.clients.pools.pool.lifecycle_state = "SCALING"
+        _, body = self.demand(25)
+        self.assertEqual(body["outcome"], "capacity_pending", body)
+        self.assertFalse(self.clients.pools.update_calls)
+
+    def test_scaling_pool_with_unknown_launch_does_not_resubmit(self):
+        self.clients.pools.update_failures.append(TimeoutError("response lost"))
+        self.demand(8)
+        self.clients.pools.pool.lifecycle_state = "SCALING"
+        _, body = self.demand(10, 2)
+        self.assertEqual(body["outcome"], "launch_pending", body)
+        self.assertEqual(len(self.clients.pools.update_calls), 1)
+
+    def test_acknowledged_launch_can_extend_target_while_scaling(self):
+        self.assertEqual(self.demand(8)[1]["outcome"], "scale_out_submitted")
+        _, body = self.demand(10, 2)
+        self.assertEqual(body["outcome"], "scale_out_submitted", body)
+        # Five unmaterialized slots in the first target already satisfy demand.
+        self.assertEqual(body["target_size"], 10)
+        self.assertEqual(body["counted_vms"], 8)
+        self.assertEqual([c[1].size for c in self.clients.pools.update_calls], [8, 10])
+
+    def test_same_demand_or_reduced_demand_does_not_duplicate_pending_growth(self):
+        self.demand(8)
+        for target, generation in [(8, 1), (8, 2), (4, 3)]:
+            _, body = self.demand(target, generation)
+            self.assertEqual(body["outcome"], "launch_pending", body)
+        self.assertEqual(len(self.clients.pools.update_calls), 1)
+
+    def test_extension_uses_only_remaining_physical_capacity(self):
+        self.detached(16)
+        self.demand(8)
+        _, body = self.demand(12, 2)
+        self.assertEqual(body["target_size"], 9, body)
+        self.assertEqual(body["counted_vms"], 24)
+        _, body = self.demand(12, 2)
+        self.assertEqual(body["outcome"], "capacity_pending", body)
+        self.assertEqual(len(self.clients.pools.update_calls), 2)
+
+    def test_rejected_extension_preserves_prior_accepted_reservation(self):
+        self.demand(8)
+        prior = copy.deepcopy(self.clients.objects.get_json(func.CAPACITY_OBJECT)["pending"]["small"])
+        self.clients.pools.update_failures.append(fake_service_error(409, "IncorrectState"))
+        self.demand(10, 2)
+        self.assertEqual(self.clients.objects.get_json(func.CAPACITY_OBJECT)["pending"]["small"], prior)
+
+    def test_unknown_extension_holds_larger_target_and_blocks_further_growth(self):
+        self.demand(8)
+        self.clients.pools.update_failures.append(TimeoutError("lost extension"))
+        _, body = self.demand(10, 2)
+        self.assertEqual(body["outcome"], "scale_out_outcome_unknown", body)
+        self.assertEqual(self.clients.objects.get_json(func.CAPACITY_OBJECT)["pending"]["small"]["target"], 10)
+        self.assertEqual(self.demand(12, 3)[1]["outcome"], "launch_pending")
+        self.assertEqual(len(self.clients.pools.update_calls), 2)
+
+    def test_legacy_reservation_without_acceptance_marker_cannot_extend(self):
+        self.demand(8)
+        record = self.clients.objects.get_json(func.CAPACITY_OBJECT)
+        record["pending"]["small"].pop("accepted", None)
+        self.clients.objects.seed(func.CAPACITY_OBJECT, record)
+        self.assertEqual(self.demand(10, 2)[1]["outcome"], "launch_pending")
+        self.assertEqual(len(self.clients.pools.update_calls), 1)
+
+    def test_membership_change_before_submission_refunds_only_unsent_increment(self):
+        for has_prior in [False, True]:
+            with self.subTest(has_prior=has_prior):
+                self.setUp()
+                prior = None
+                if has_prior:
+                    self.demand(8)
+                    prior = copy.deepcopy(self.clients.objects.get_json(func.CAPACITY_OBJECT)["pending"]["small"])
+                original = func._put_capacity
+                def racing_put(config, clients, record, etag):
+                    result = original(config, clients, record, etag)
+                    pending = record["pending"].get("small")
+                    if pending and pending.get("accepted") is False:
+                        self.clients.pools.members.pop()
+                    return result
+                with patch.object(func, "_put_capacity", racing_put):
+                    _, body = self.demand(10, 2)
+                self.assertEqual(body["outcome"], "pool_state_changed", body)
+                self.assertTrue(body["retryable"])
+                self.assertEqual(self.clients.objects.get_json(func.CAPACITY_OBJECT)["pending"].get("small"), prior)
+                self.assertEqual(len(self.clients.pools.update_calls), int(has_prior))
+
+    def test_failed_work_request_blocks_extending_accepted_launch(self):
+        self.demand(8)
+        self.clients = replace(self.clients, work_requests=obj(
+            get_work_request=lambda value: response(obj(status="FAILED")),
+            list_work_request_errors=lambda value, **kwargs: response([]),
+        ))
+        self.assertEqual(self.demand(10, 2)[1]["outcome"], "launch_failed")
+        self.assertEqual(len(self.clients.pools.update_calls), 1)
+
+    def test_extension_keeps_original_deadline_and_work_request_ids(self):
+        self.demand(8)
+        prior = self.clients.objects.get_json(func.CAPACITY_OBJECT)["pending"]["small"]
+        self.time += timedelta(seconds=800)
+        self.demand(10, 2)
+        pending = self.clients.objects.get_json(func.CAPACITY_OBJECT)["pending"]["small"]
+        self.assertEqual(pending["createdAt"], prior["createdAt"])
+        self.assertTrue(set(prior["workRequestIds"]) <= set(pending["workRequestIds"]))
+        self.time += timedelta(seconds=101)
+        self.assertEqual(self.demand(12, 3)[1]["outcome"], "launch_verification_required")
+        self.assertEqual(len(self.clients.pools.update_calls), 2)
 
     def test_stale_membership_after_decrement_does_not_launch_during_cleanup(self):
         retirees = [m.id for m in self.clients.pools.members if m.id != SCALE_INSTANCE_ID]
@@ -177,6 +317,32 @@ class ControllerAcceptance(unittest.TestCase):
         self.clients.pools.pool.size = self.clients.pools.pool.current_size = 4
         _, body = self.demand(8)
         self.assertEqual(body["outcome"], "pool_state_changed", body)
+        self.assertFalse(self.clients.pools.update_calls)
+
+    def test_historical_terminated_member_is_excluded_only_after_compute_confirmation(self):
+        member = self.clients.pools.members[-1]
+        member.state = "Terminated"  # Actual OCI summary uses title case.
+        self.clients.compute.instances[member.id].lifecycle_state = "TERMINATED"
+        self.clients.pools.pool.size = self.clients.pools.pool.current_size = 2
+        _, body = self.demand(3)
+        self.assertEqual(body["outcome"], "scale_out_submitted", body)
+        self.assertEqual(body["observed_attached_size"], 2)
+
+    def test_terminated_summary_with_live_compute_still_counts(self):
+        member = self.clients.pools.members[-1]
+        member.state = "Terminated"
+        self.clients.compute.instances[member.id].lifecycle_state = "TERMINATING"
+        self.clients.pools.pool.size = self.clients.pools.pool.current_size = 2
+        _, body = self.demand(3)
+        self.assertEqual(body["outcome"], "pool_state_changed", body)
+        self.assertFalse(self.clients.pools.update_calls)
+
+    def test_terminated_summary_unreadable_compute_fails_closed(self):
+        member = self.clients.pools.members[-1]
+        member.state = "Terminated"
+        del self.clients.compute.instances[member.id]
+        status, _ = self.demand(8)
+        self.assertGreaterEqual(status, 400)
         self.assertFalse(self.clients.pools.update_calls)
 
     def test_sdk_wrapped_transport_error_is_retryable_without_exposing_details(self):

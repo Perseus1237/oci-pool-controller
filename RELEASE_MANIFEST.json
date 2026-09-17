@@ -56,9 +56,9 @@
       "sha256": "cf0d479beb49973d59cf650b10412af63083a2d01b98a5423f4aa1e4fbd98f3f"
     },
     {
-      "bytes": 21232,
+      "bytes": 21627,
       "path": "docs/RUNBOOK.md",
-      "sha256": "b7ff0f7041c448d0b847dbef4240a7c789653eb14ec69d87c8952c7db8951fff"
+      "sha256": "3c7438aefd0cb2d07edb76ff196b95591c9dbc73c8e4de4f4d26a7b1f4ebacd6"
     },
     {
       "bytes": 15786,
@@ -81,9 +81,9 @@
       "sha256": "ea68ddf0cb744ee92ebada5a981c6a1a3f083cfd815e13d89b19bba4dcc56ed1"
     },
     {
-      "bytes": 190441,
+      "bytes": 193729,
       "path": "function/func.py",
-      "sha256": "f1e227bdf34dfa073953929ea0fb19fa45623ca51b0958f371276afcb3a951bc"
+      "sha256": "6e4b9651343330fe1380fc4cdddb2f26d813db21e340c675ad65333cd85c1021"
     },
     {
       "bytes": 26,
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 22046,
+      "bytes": 22195,
       "path": "README.md",
-      "sha256": "123712358e9427832d245b661c1286d54982f121f609f8a89af463c3db77df97"
+      "sha256": "62c79ebd43886597b9f180b24dddca7fe5e774c45ad54d248a5ce67c7649b090"
     },
     {
       "bytes": 2889,
@@ -167,8 +167,8 @@
     },
     {
       "path": "docs/BOUNDED_GROWTH_ACCEPTANCE.md",
-      "bytes": 11928,
-      "sha256": "474729d31532ec65fda3bc7cd9595c93de7e7ffa2da235c993abb5c10b682b7c"
+      "bytes": 13110,
+      "sha256": "d5fc734c6e651ada67d5e5bce503268ef62ca1689c1dd957d3c2bb1934063741"
     },
     {
       "path": "tests/controller_fakes.py",
@@ -177,13 +177,18 @@
     },
     {
       "path": "tests/test_controller_acceptance.py",
-      "bytes": 32232,
-      "sha256": "0e5dffbeb3370640d2c2b100d89eb0a76a45795b8c26ecced21a1623c3d1d15b"
+      "bytes": 41286,
+      "sha256": "9afefa0b0c41357845e4d403d713f01d34b7baa9405c10716dcf87112de57687"
     },
     {
       "path": "docs/LIVE_ACCEPTANCE_20260917.md",
       "bytes": 15529,
       "sha256": "72d79c05920e5b67a01fab0528cf20f4641b89c0bb573bb8b9bd4dd4cd258a13"
+    },
+    {
+      "path": "docs/SCALING_STATE_ACCEPTANCE_20260917.md",
+      "bytes": 11002,
+      "sha256": "d5961335c14d0b97e7250277f6c499a796f115b114c8a48b109553b6d969ca09"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",

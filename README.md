@@ -87,8 +87,10 @@ documents activation, IAM and rollback constraints.
   Retirement is permanent. New workers start protected with `"1"`; the string
   `"false"` is not equivalent to `"0"`. Approve any tag-convention migration.
 - The default remains retire-first/no surge with a possible capacity gap.
-  The bounded-growth preview requires explicit staging acceptance; it cannot
-  override an OCI pool's busy state or make committed workers reusable.
+  The bounded-growth preview requires explicit staging acceptance. It can grow
+  in SCALING with verified accounting, but cannot make committed workers reusable;
+  exact detach still requires RUNNING. See the
+  [SCALING-state tests and remaining guards](docs/SCALING_STATE_ACCEPTANCE_20260917.md).
 - Own continued retries and periodic replay of the latest demand, including
   after completion. Status reads do not advance work. Adapt the illustrative
   single-host SQLite outbox to shared transactional control-plane state for

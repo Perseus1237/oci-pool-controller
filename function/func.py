@@ -1177,7 +1177,17 @@ def _members(scope: Scope, clients: Clients) -> list[Any]:
         data = _mapping_value(response, "data", [])
         if not isinstance(data, Sequence) or isinstance(data, (str, bytes)):
             raise HarnessError(502, "invalid_oci_response", "OCI returned an invalid member list")
-        members.extend(data)
+        for member in data:
+            # Native shrink can leave historical "Terminated" summaries in
+            # the pool list even after the pool is RUNNING at its lower target.
+            # Never treat a summary alone as released capacity: independently
+            # confirm the Compute lifecycle before excluding that identity.
+            state = _mapping_value(member, "state", _mapping_value(member, "lifecycle_state", ""))
+            if isinstance(state, str) and state.upper() == "TERMINATED":
+                instance, _ = _instance(scope, clients, _mapping_value(member, "id"))
+                if _mapping_value(instance, "lifecycle_state") == "TERMINATED":
+                    continue
+            members.append(member)
         next_page = _header(_response_headers(response), "opc-next-page")
         if not next_page:
             return members
@@ -1332,7 +1342,8 @@ def _detach(
     """Detach one exact OCID while decrementing its instance-pool slot.
 
     Callers choose whether OCI also terminates the detached instance. All
-    current scale-in and self-reclaim paths pass ``auto_terminate=True``.
+    legacy scale-in and self-reclaim paths pass ``auto_terminate=True``;
+    bounded growth submits termination separately.
     ``request_id`` is reused as OCI's retry token for idempotent submission.
     """
 
@@ -2474,6 +2485,7 @@ def _capacity_record(config: Config, clients: Clients) -> tuple[Mapping[str, Any
             or not isinstance(value.get("createdAt"), str)
             or not isinstance(value.get("workRequestIds"), list)
             or any(not isinstance(item, str) for item in value["workRequestIds"])
+            or ("accepted" in value and not isinstance(value["accepted"], bool))
             for key, value in pending.items()
         )
     ):
@@ -2518,7 +2530,9 @@ def _bounded_reconcile_once(
     """Preview protocol: detach one exact worker, terminate separately, grow with headroom.
 
     Requires exclusive ownership of pool sizing, membership, protection and
-    ledger writes. OCI pool mutations are still prohibited while not RUNNING.
+    ledger writes. Growth may extend a positively acknowledged target during
+    SCALING. Exact detach requires RUNNING (live OCI returns IncorrectState
+    during active growth); ambiguous launches never permit another mutation.
     Caller replays drive progress; there is no hidden background worker.
     """
     if not _is_latest_request(config, clients, profile, request_id, generation, desired):
@@ -2573,6 +2587,7 @@ def _bounded_reconcile_once(
         if not config.dry_run:
             base["work_request_ids"] = _advance_detached_retirement(config, clients, scope, profile, retiring, member_ids, exclusions, fence)
         pending = capacity["pending"].get(profile.key)
+        extending = False
         if pending:
             # Re-observation, never a time-based refund. Do not issue a second
             # update while acceptance of the first is unknown, even on new demand.
@@ -2616,9 +2631,21 @@ def _bounded_reconcile_once(
                 except (ValueError, TypeError):
                     raise HarnessError(502, "invalid_ledger_record", "invalid launch reservation timestamp")
                 overdue = age >= config.launch_timeout_seconds
-                return result("launch_verification_required" if overdue else "launch_pending",
-                              reserved_target=pending["target"], work_request_ids=pending["workRequestIds"],
-                              intervention_required=overdue, retryable=not overdue)
+                # A successful API response is different from an unknown
+                # outcome. Its unmaterialized slots already satisfy demand;
+                # reserve only a monotonic increment above that target. Old
+                # ledger records lacking the marker remain conservative.
+                planned_usable = current - len(member_ids & set(retiring))
+                extending = (
+                    not overdue and pending.get("accepted") is True
+                    and current == pending["target"] and len(member_ids) <= current
+                    and desired > planned_usable
+                    and _mapping_value(scope.pool, "lifecycle_state") in {"RUNNING", "SCALING"}
+                )
+                if not extending:
+                    return result("launch_verification_required" if overdue else "launch_pending",
+                                  reserved_target=pending["target"], work_request_ids=pending["workRequestIds"],
+                                  intervention_required=overdue, retryable=not overdue)
 
         if converged and not retiring:
             return result("already_at_target", complete=True)
@@ -2628,20 +2655,23 @@ def _bounded_reconcile_once(
                           counted_ocpus=sum(usage[key] * config.scale_test_profiles[key].ocpus for key in usage))
 
         scope = _resolve_scale_test_scope(profile, config, clients)
-        if _mapping_value(scope.pool, "lifecycle_state") != "RUNNING":
-            return result("pool_busy", pending_reason="oci_pool_not_running")
+        if _mapping_value(scope.pool, "lifecycle_state") not in {"RUNNING", "SCALING"}:
+            return result("pool_busy", pending_reason="pool_lifecycle_not_mutable")
         # OCI can report RUNNING and a decremented target before the member
         # list drops the detached identity. Mixing those observations creates
         # a false deficit (and an unnecessary replacement during scale-down).
-        # Conversely, a short member list is not evidence of a free launch
-        # slot. Wait for coherent target/membership before either pool mutation.
-        if _pool_size(scope.pool) != current or len(member_ids) != current:
+        # A short list is allowed only for our acknowledged pending growth:
+        # its reserved target, not just materialized members, satisfies demand.
+        fresh_member_ids = {_mapping_value(member, "id") for member in _members(scope, clients)}
+        if (_pool_size(scope.pool) != current or fresh_member_ids != member_ids
+                or (len(member_ids) != current and not extending)):
             return result("pool_state_changed")
 
         # Target means usable capacity. Attached commitments remain physical
         # capacity but must not satisfy fresh demand. Launch replacements first
         # when there is headroom; otherwise release one pool slot below.
-        deficit = desired - usable
+        planned_usable = current - len(member_ids & set(retiring)) if extending else usable
+        deficit = desired - planned_usable
         if deficit > 0:
             matches, message = _scale_test_configuration_check(scope, profile, clients)
             if not matches:
@@ -2656,23 +2686,35 @@ def _bounded_reconcile_once(
             if not usage[profile.key] and active >= config.max_active_scale_test_profiles:
                 slots = 0
             base.update(counted_vms=total_vms, counted_ocpus=total_ocpus)
-            if not slots and not (member_ids & set(retiring)):
+            if not slots and (extending or not (member_ids & set(retiring))):
                 return result("capacity_pending", pending_reason="configured_capacity_guard")
             if not slots:
                 return _bounded_detach_one(config, clients, scope, profile, exclusions, request_id, now, fence, result)
             target = current + slots
             sequence = capacity["sequence"] + 1
+            previous_pending = capacity["pending"].get(profile.key)
+            prior_work_ids = previous_pending["workRequestIds"] if previous_pending else []
             pending = {"target": target, "requestId": request_id, "generation": generation,
                        "token": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{config.harness_id}:{scope.pool_id}:{sequence}:{request_id}")),
-                       "createdAt": _timestamp(now), "workRequestIds": []}
+                       "createdAt": previous_pending["createdAt"] if previous_pending else _timestamp(now),
+                       "workRequestIds": list(prior_work_ids), "accepted": False}
             capacity = {**capacity, "sequence": sequence, "pending": {**capacity["pending"], profile.key: pending}}
             fence()
             # Global CAS makes competing reservations conflict even if a lease
             # expires during a slow capacity scan. Persist BEFORE the OCI call.
             capacity_etag = _put_capacity(config, clients, capacity, capacity_etag)
             fresh = _resolve_scale_test_scope(profile, config, clients)
-            if _pool_size(fresh.pool) != current or _mapping_value(fresh.pool, "lifecycle_state") != "RUNNING":
-                return result("launch_verification_required", intervention_required=True, retryable=False)
+            if (_pool_size(fresh.pool) != current
+                    or _mapping_value(fresh.pool, "lifecycle_state") not in {"RUNNING", "SCALING"}
+                    or {_mapping_value(member, "id") for member in _members(fresh, clients)} != member_ids):
+                # No API submission has happened: this increment is known
+                # unsent, unlike a lost response. Preserve the prior launch.
+                restored = {**capacity, "pending": {key: value for key, value in capacity["pending"].items() if key != profile.key}}
+                if previous_pending is not None:
+                    restored["pending"][profile.key] = previous_pending
+                fence()
+                _put_capacity(config, clients, restored, capacity_etag)
+                return result("pool_state_changed")
             fence()
             try:
                 response = clients.pools.update_instance_pool(fresh.pool_id, _model("UpdateInstancePoolDetails", size=target),
@@ -2683,12 +2725,14 @@ def _bounded_reconcile_once(
                 # and unclassified failures retain their reservation indefinitely.
                 if getattr(error, "status", None) in {400, 401, 403, 404, 409, 412, 429}:
                     cleared = {**capacity, "pending": {key: value for key, value in capacity["pending"].items() if key != profile.key}}
+                    if previous_pending is not None:
+                        cleared["pending"][profile.key] = previous_pending
                     _put_capacity(config, clients, cleared, capacity_etag)
                     raise converted from error
                 return result("scale_out_outcome_unknown", target_size=target, reserved_target=target,
                               pending_reason=converted.reason)
-            work_ids = [value for value in (_work_request_id(response),) if value]
-            capacity["pending"][profile.key] = {**pending, "workRequestIds": work_ids}
+            work_ids = list(dict.fromkeys([*prior_work_ids, *[value for value in (_work_request_id(response),) if value]]))
+            capacity["pending"][profile.key] = {**pending, "workRequestIds": work_ids, "accepted": True}
             _put_capacity(config, clients, capacity, capacity_etag)
             return result("scale_out_submitted", target_size=target, reserved_target=target, work_request_ids=work_ids)
 
@@ -2728,6 +2772,8 @@ def _bounded_detach_one(config, clients, scope, profile, exclusions, request_id,
     """One exact irreversible retirement per replay; never bulk shrink."""
     if not config.enable_termination:
         return result("termination_disabled", intervention_required=True, retryable=False)
+    if _mapping_value(scope.pool, "lifecycle_state") != "RUNNING":
+        return result("pool_busy", pending_reason="detach_requires_running")
     candidates = _eligible_scale_in_candidates(scope, clients, profile, exclusions, _members(scope, clients))
     if candidates:
         instance_id = candidates[0][1]

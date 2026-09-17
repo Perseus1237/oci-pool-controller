@@ -4,13 +4,14 @@ Implementation date: 2026-09-16. The original results below are an **offline
 implementation snapshot**, not production qualification. The subsequent
 [2026-09-17 isolated live acceptance report](LIVE_ACCEPTANCE_20260917.md) records
 the actual OCI tests, IAM correction and remaining gaps; use that report for
-current live status. No released GitHub branch was changed by these local tests.
+current live status. The later [SCALING-state qualification](SCALING_STATE_ACCEPTANCE_20260917.md)
+records operation-specific API probes and the removal of the blanket growth gate.
 
 ## Changes
 
 - Opt-in `enable_bounded_growth` / `ENABLE_BOUNDED_GROWTH` (default `false`).
   New demand can launch without waiting for every committed termination, when
-  the pool is RUNNING and physical VM/OCPU headroom exists. Attached retiring
+  the pool is RUNNING or SCALING and physical VM/OCPU headroom exists. Attached retiring
   instances never satisfy new usable-capacity demand.
 - At most one exact detach and one detached-worker termination per replay.
   Detach decrements pool size with `is_auto_terminate=false`; a later replay
@@ -22,9 +23,14 @@ current live status. No released GitHub branch was changed by these local tests.
   reserved target, plus detached retirees. Apply VM, OCPU, active-pool and
   per-profile physical limits together. Partial growth uses available slots.
 - Unknown launch outcomes retain their reservations across invocation restarts
-  and new desired generations. No second update is submitted until the first
-  is observed complete or an operator resolves it. Explicit pre-admission OCI
-  rejection refunds its reservation; elapsed time never does.
+  and new desired generations; no second update is submitted until verified.
+  A positively acknowledged launch can be extended to a higher absolute target
+  during SCALING. Its reserved, unmaterialized slots already satisfy demand:
+  only the additional deficit is reserved. The original timeout and work-request
+  history remain. Explicit pre-admission rejection of an extension restores its
+  prior reservation; uncertain outcomes retain the larger target. Old records
+  without the boolean `accepted` marker retain conservative wait-for-verification
+  behavior. Never edit this marker manually or clear reservations on timeout.
 - `CONTROLLER_LAUNCH_TIMEOUT_SECONDS` (default 900) bounds launch observation.
   A failed work request, unavailable diagnostics or an exceeded deadline returns
   `intervention_required=true`, `retryable=false`, and available work-request
@@ -38,8 +44,10 @@ current live status. No released GitHub branch was changed by these local tests.
   500. Both default and preview completion require actual RUNNING instances.
   Infrastructure/boot readiness is explicitly not scheduler dispatchability.
 - The subsequent live-test correction waits when pool target and membership
-  counts disagree. A stale member list after size decrement must not create a
-  false usable-capacity deficit or launch a replacement during cleanup.
+  counts disagree unless the shortfall belongs to positively acknowledged growth.
+  A stale member list after size decrement must not create a false deficit.
+  Historical Terminated membership summaries are excluded only after independent
+  Compute confirmation; unreadable or still-terminating identities fail closed.
 - Subsequent hardening recognizes the OCI SDK's wrapped request exceptions as
   retryable and logs bounded exception type/classification. Unknown exceptions
   remain terminal; an observed cleanup failure's original cause is unconfirmed
@@ -49,12 +57,16 @@ current live status. No released GitHub branch was changed by these local tests.
 
 ## Safety contract and activation
 
-This is an opt-in staging protocol, not a way to bypass OCI pool lifecycle
-restrictions. A SCALING pool still returns `pool_busy`. Separate detachment
-permitted RUNNING/reburst before termination finished in the linked isolated
-live test. That is not a universal timing guarantee. Environments that do not
-permit the necessary update may require a separate pool per logical worker
-class; that architecture is not implemented.
+This is an opt-in staging protocol. Growth may proceed in SCALING, including a
+monotonic extension of a positively acknowledged launch. Unknown launch outcomes,
+inconsistent membership, failed work requests, exhausted budgets and nonmutable
+lifecycle states still block it. Exact detach retains a RUNNING-only guard:
+both detach variants returned OCI `409 IncorrectState` during active growth in
+the explicit live probe. Growth after combined detach-and-terminate was accepted
+in SCALING. These are operation-specific observations, not a universal promise
+that every mutation is accepted in every SCALING phase. Completion still requires
+RUNNING workers and completed retirements; submission is not scheduler readiness.
+The legacy/default path remains retire-first; the opt-in flag has not changed.
 
 Before activation:
 
@@ -125,8 +137,9 @@ not use the external handoff's unpublished hotfix/harness code. Tests cover:
   default retire-first compatibility, and 300 seeded mixed-demand transitions
   with VM/OCPU accounting assertions at every transition.
 
-These doubles deliberately allow RUNNING after detach. That is a hypothesis
-for the live test, **not evidence of OCI service timing**. No offline test can
+The original doubles allowed RUNNING after detach; the expanded tests also
+exercise SCALING growth. The separate live reports provide service evidence,
+not the doubles. No offline test can
 prove launch latency, scheduler registration, IAM correctness or job safety.
 
 ## Live acceptance checklist — subsequent results in linked report
@@ -142,9 +155,10 @@ unrelated logged-in tenancy for the handoff's staging environment.
 2. Submit fresh demand while the detached worker remains terminating. Require
    a new launch to be accepted before that termination completes **when OCI
    permits the pool update and approved headroom exists**. Record request-to-
-   launch and launch-to-scheduler-ready latency against an agreed SLO. If OCI
-   keeps the pool SCALING, record this as a failed immediate-reburst requirement,
-   not a controller pass. Stop and revisit the multi-pool design.
+   launch and launch-to-scheduler-ready latency against an agreed SLO. Record
+   pool state and the actual API result; SCALING alone is not a failed requirement.
+   If safe growth cannot be admitted before termination completes, report that
+   limitation explicitly rather than claiming immediate reburst.
 3. Exercise no headroom, then exactly one freed slot; under the agreed 25-VM
    test guard, verify global physical+reserved accounting never exceeds 25
    or the OCPU cap. Daily creation quotas are a separate environmental limit.

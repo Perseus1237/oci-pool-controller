@@ -182,7 +182,8 @@ Do not clear a lease or edit the ledger manually to force progress.
 | Symptom | Meaning/check | Safe action |
 | --- | --- | --- |
 | HTTP success but no change | Direct invoke envelope may contain a business error, dry-run, submitted or queued state. | Inspect application status/body; verify dry-run and action; do not infer readiness. |
-| `pool_busy` / long SCALING | OCI mutation is in progress, or launches remain unsatisfied. | Preserve latest demand; use bounded replay, inspect work requests and alert on age. |
+| `pool_busy` / long SCALING | Inspect `pending_reason`: bounded growth allows SCALING, but exact detach requires RUNNING; other lifecycle states and OCI IncorrectState can still block. Legacy/default mode retains its RUNNING gate. | Preserve latest demand; use bounded replay, inspect work requests and alert on age. |
+| `launch_pending` | A reserved target is not yet observed complete. Only positively acknowledged launches can be extended upward; unknown/legacy outcomes cannot. | Replay latest demand; never clear reservations or manually set their `accepted` marker. |
 | `pool_state_changed` | Target and membership observations disagree, including transient stale membership after detach. | Replay the same demand after backoff. Do not infer free capacity or clear commitments; alert if inconsistency persists. |
 | `awaiting_eligible_instances` | Desired reduction lacks safe RUNNING, in-scope, non-excluded tag-0 workers. | your platform reviews drain decisions. Do not select a busy/protected replacement victim. |
 | `retirement_pending` | A commitment remains unfinished; detached does not mean TERMINATED. | Inspect exact identities/lifecycles, scope/protection and exclusions. Resume latest demand after resolving cause. |
