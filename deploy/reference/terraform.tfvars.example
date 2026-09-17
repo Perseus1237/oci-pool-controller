@@ -20,6 +20,9 @@ ocir_username               = "Default/REPLACE_USERNAME"
 
 dry_run               = true
 enable_termination    = false
+enable_bounded_growth = false # Preview only; see docs/BOUNDED_GROWTH_ACCEPTANCE.md.
+max_total_vms         = 25    # Includes reserved launches and retiring VMs in preview mode.
+launch_timeout_seconds = 900 # Requires review after expiry; never refunds reservations.
 create_iam_resources  = false
 invoker_group_ocids   = [] # Optional; configure approved caller permissions before invoking.
 # The Console's Configure caller groups toggle only shows/hides the editor.

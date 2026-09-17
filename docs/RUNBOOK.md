@@ -1,5 +1,13 @@
 # OCI Pool Controller staging and operations runbook
 
+For the opt-in bounded-growth preview, use the additional
+[acceptance and recovery gates](BOUNDED_GROWTH_ACCEPTANCE.md). The retire-first
+sections below describe the default policy, not the preview. New offline
+controller acceptance tests are bundled. The separate
+[2026-09-17 live report](LIVE_ACCEPTANCE_20260917.md) records the isolated
+bounded-growth results and remaining gaps; it does not certify this whole
+runbook or the external handoff environment.
+
 ## Safety boundary
 
 Release `0.12.0-rc.1` supports review and bounded staging. Start with the package
@@ -175,6 +183,7 @@ Do not clear a lease or edit the ledger manually to force progress.
 | --- | --- | --- |
 | HTTP success but no change | Direct invoke envelope may contain a business error, dry-run, submitted or queued state. | Inspect application status/body; verify dry-run and action; do not infer readiness. |
 | `pool_busy` / long SCALING | OCI mutation is in progress, or launches remain unsatisfied. | Preserve latest demand; use bounded replay, inspect work requests and alert on age. |
+| `pool_state_changed` | Target and membership observations disagree, including transient stale membership after detach. | Replay the same demand after backoff. Do not infer free capacity or clear commitments; alert if inconsistency persists. |
 | `awaiting_eligible_instances` | Desired reduction lacks safe RUNNING, in-scope, non-excluded tag-0 workers. | your platform reviews drain decisions. Do not select a busy/protected replacement victim. |
 | `retirement_pending` | A commitment remains unfinished; detached does not mean TERMINATED. | Inspect exact identities/lifecycles, scope/protection and exclusions. Resume latest demand after resolving cause. |
 | `retirement_committed` | An attempt tried to re-protect a permanent retirement. | Reject reuse in the scheduler; provision different workers if needed. |

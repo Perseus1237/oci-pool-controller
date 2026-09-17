@@ -278,6 +278,14 @@ testing enrolled operations.
 
 Permissions are bounded to specified compartments, with Object Storage writes limited to this bucket and without object-list/delete authority. Runtime Compute rights are **not individually IAM-bound to each pool OCID**; the code's pinned allowlist is an additional safety boundary. The controller needs pool updates and launch dependencies for scale-out. Targeted detach/delete dependencies are added only when `enable_termination = true`; centrally managed IAM must be updated manually at that point. Custom image/network/volume placement must be reviewed rather than broadening to tenancy-wide `manage all-resources`.
 
+When pool instances and their subnet are in different compartments, review
+both launch-preflight and actual network-resource permissions. The controller
+statements include `SUBNET_ATTACH` in the pool compartment and restricted VNIC
+create/read/attach/detach/delete permissions in the network compartment. A live
+cross-compartment launch failed with `Missing instance launch permissions`
+until these dependencies were present. Centrally managed IAM must incorporate
+these statements too; updating Function configuration alone does not fix IAM.
+
 ## 5. Deploy dry-run and perform signed checks
 
 ### Resource Manager option
@@ -371,3 +379,12 @@ Stop scheduler writes first, set `dry_run=true` and `enable_termination=false`, 
 Before switching back to another scaler, reconcile actual OCI membership, committed retirements and latest demand with your platform; never re-protect or reuse committed workers. Do not run two writers during rollback. Pin any rollback image digest and verify that version understands the existing ledger schema and retirement semantics; old demo versions are not a safe generic downgrade.
 
 `terraform destroy` is **not worker drain or safe rollback**: this module does not own workers, and the ledger/lease have `prevent_destroy` guards. Removing those guards, deleting state, recreating the ledger or importing another environment's state requires an explicit retention/migration review. Retain operator operational records; no automated history pruning is supplied.
+
+## Bounded-growth preview supplement
+
+The controller changes and required staging gates are documented in
+[bounded-growth acceptance](../../docs/BOUNDED_GROWTH_ACCEPTANCE.md).
+`enable_bounded_growth=false` remains the default; `max_total_vms` and
+`launch_timeout_seconds` apply to the preview. Enabling it requires a rebuilt
+image containing this source, not just new Function environment variables.
+Existing Terraform state and the Object Storage ledger must be preserved.

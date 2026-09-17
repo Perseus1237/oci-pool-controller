@@ -70,6 +70,14 @@ The [implementation notes](docs/implementation-notes.md) provide a practical
 engineering guide to the controller API, durable caller state, scale-out,
 irreversible retirement, response handling and current safety boundaries.
 
+The opt-in [bounded-growth controller preview](docs/BOUNDED_GROWTH_ACCEPTANCE.md)
+adds durable VM/OCPU launch reservations and separate exact-worker termination
+so returning demand can launch while retirees remain, when OCI permits a pool
+update and capacity is available. It is **disabled by default and not production
+qualified**. The [isolated live acceptance report](docs/LIVE_ACCEPTANCE_20260917.md)
+records the observed OCI results and remaining qualification gaps. The guide
+documents activation, IAM and rollback constraints.
+
 ## Platform integration responsibilities
 
 - Publish absolute desired **non-retiring** capacity. Persist a UUID, payload
@@ -78,8 +86,9 @@ irreversible retirement, response handling and current safety boundaries.
   before committing an exact worker with `set_pool_protection(tag_value="0")`.
   Retirement is permanent. New workers start protected with `"1"`; the string
   `"false"` is not equivalent to `"0"`. Approve any tag-convention migration.
-- Accept retire-first/no surge and its possible capacity gap. Returning demand
-  requires different workers after committed retirements finish.
+- The default remains retire-first/no surge with a possible capacity gap.
+  The bounded-growth preview requires explicit staging acceptance; it cannot
+  override an OCI pool's busy state or make committed workers reusable.
 - Own continued retries and periodic replay of the latest demand, including
   after completion. Status reads do not advance work. Adapt the illustrative
   single-host SQLite outbox to shared transactional control-plane state for
@@ -103,7 +112,8 @@ configuration, even a disabled one.
 - Terraform referencing existing operator pools and networking; no demo fleet.
 - Signed OCI invocation client with an illustrative durable local outbox.
 - Architecture, implementation notes, operations and staging acceptance guides.
-- Deployment helper and packaging regression tests (`python3 -m unittest discover -s tests -v`).
+- Controller offline acceptance, deployment and packaging regression tests
+  (`python3 -m unittest discover -s tests -v`).
 - `RELEASE_MANIFEST.json` with the SHA-256 of every included content file.
 
 Historical controller tests, lab assets and historical evidence are not included

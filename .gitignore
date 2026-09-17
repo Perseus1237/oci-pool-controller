@@ -16,3 +16,4 @@ __pycache__/
 dist/
 .DS_Store
 Screenshot*.png
+.local/

@@ -184,6 +184,10 @@ class Outbox:
     def record(self, payload: Mapping[str, Any], reply: Reply) -> None:
         if reply.superseded:
             state = "superseded"
+        elif reply.body.get("intervention_required") is True:
+            # A held capacity reservation is NOT a retry loop. Stop automatic
+            # maintenance and alert the operator; never reset the server ledger.
+            state = "failed"
         elif reply.retryable:
             state = "pending"
         elif reply.status >= 400 or reply.body.get("request_state") == "failed" or reply.body.get("result") in {"failed", "error", "rejected"}:

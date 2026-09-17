@@ -243,6 +243,32 @@ variable "dry_run" {
   default     = true
 }
 
+variable "enable_bounded_growth" {
+  description = "Opt-in preview: durable launch reservations, bounded replacement growth and separate exact termination. Requires exclusive controller ownership and staging acceptance before production. Do not disable after ledger activation without migration."
+  type        = bool
+  default     = false
+}
+
+variable "max_total_vms" {
+  description = "Aggregate VM cap across enrolled pools, including reserved launches and attached/detached retiring workers (bounded-growth preview). Not an OCI tenancy quota."
+  type        = number
+  default     = 25
+  validation {
+    condition     = var.max_total_vms >= 1 && floor(var.max_total_vms) == var.max_total_vms
+    error_message = "max_total_vms must be a positive integer."
+  }
+}
+
+variable "launch_timeout_seconds" {
+  description = "Time before an unresolved bounded-growth launch requires operator review. Expiry never releases its capacity reservation."
+  type        = number
+  default     = 900
+  validation {
+    condition     = var.launch_timeout_seconds >= 1 && floor(var.launch_timeout_seconds) == var.launch_timeout_seconds
+    error_message = "launch_timeout_seconds must be a positive integer."
+  }
+}
+
 variable "enable_termination" {
   description = "Separate targeted-termination kill switch. Enable only after worker-drain and IAM acceptance."
   type        = bool

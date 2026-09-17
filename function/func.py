@@ -11,11 +11,15 @@ Scale-out uses OCI's normal ``UpdateInstancePool(size=desired)`` API. Scale-in
 intentionally never uses that API: a smaller generic size would allow OCI to
 choose the termination victim. Instead, the reconciler detaches only explicitly
 drained workers whose exact protection tag is the string ``"0"``. Each detach
-both decrements the pool and auto-terminates that exact instance.
+decrements the pool. The default policy auto-terminates that exact instance;
+the opt-in bounded-growth preview terminates it separately.
 
 Desired size means non-retiring capacity, not all attached instances. The
 bounded replacement policy is retire-first: finish committed retirements before
 launching toward the latest demand, without temporarily requesting surge size.
+ENABLE_BOUNDED_GROWTH opts into a preview protocol with durable launch
+reservations and bounded growth while retirement continues. Live OCI timing
+and scheduler acceptance remain deployment prerequisites.
 
 One container image serves three least-privilege Function roles:
 
@@ -187,6 +191,9 @@ class Config:
     max_profiles: int = MAX_SCALE_TEST_PROFILES
     max_instances_per_profile: int = HARD_MAX_SCALE_TEST_POOL_SIZE
     allow_empty_pool_registry: bool = False
+    bounded_growth: bool = False
+    max_total_vms: int = 25
+    launch_timeout_seconds: int = 900
 
 
 @dataclass(frozen=True)
@@ -197,6 +204,7 @@ class Clients:
     pools: Any
     objects: Any | None = None
     autoscaling: Any | None = None
+    work_requests: Any | None = None
 
 
 @dataclass(frozen=True)
@@ -845,6 +853,11 @@ def _config(environ: Mapping[str, str]) -> Config:
     budget_enabled = _parse_bool(environ.get("SCALE_TEST_BUDGET_LIMITS_ENABLED"), "SCALE_TEST_BUDGET_LIMITS_ENABLED", default=True)
     if controller_only and (not budget_enabled or (not profiles and not allow_empty_pool_registry)):
         raise HarnessError(500, "invalid_configuration", "controller-only mode requires registered pools and enabled capacity guards")
+    bounded_growth = _parse_bool(environ.get("ENABLE_BOUNDED_GROWTH"), "ENABLE_BOUNDED_GROWTH", default=False)
+    max_total_vms = _parse_nonnegative_int(environ.get("CONTROLLER_MAX_TOTAL_VMS", "25"), "CONTROLLER_MAX_TOTAL_VMS")
+    launch_timeout = _parse_nonnegative_int(environ.get("CONTROLLER_LAUNCH_TIMEOUT_SECONDS", "900"), "CONTROLLER_LAUNCH_TIMEOUT_SECONDS")
+    if min(max_total_vms, launch_timeout) < 1 or (bounded_growth and (not controller_only or auth_mode != "oci_iam")):
+        raise HarnessError(500, "invalid_configuration", "bounded growth requires controller-only IAM mode and positive VM/launch-timeout limits")
 
     return Config(
         configured_pool_id=configured_pool_id,
@@ -873,6 +886,9 @@ def _config(environ: Mapping[str, str]) -> Config:
         max_profiles=max_profiles,
         max_instances_per_profile=max_instances,
         allow_empty_pool_registry=allow_empty_pool_registry,
+        bounded_growth=bounded_growth,
+        max_total_vms=max_total_vms,
+        launch_timeout_seconds=launch_timeout,
     )
 
 
@@ -1568,6 +1584,8 @@ def _scale_test_status(config: Config, clients: Clients, now: datetime) -> tuple
     active_profiles = 0
     total_desired_ocpus = 0
     total_effective_ocpus = 0
+    total_effective_vms = 0
+    capacity, _ = _capacity_record(config, clients) if config.controller_only else (None, None)
     all_configurations_match = True
     for profile in config.scale_test_profiles.values():
         scope = _resolve_scale_test_scope(profile, config, clients)
@@ -1607,11 +1625,13 @@ def _scale_test_status(config: Config, clients: Clients, now: datetime) -> tuple
         reported_current = _reported_current_size(scope.pool, len(members))
         member_ids = {_mapping_value(member, "id") for member in members}
         detached_retiring = len(set(retiring) - member_ids)
-        effective_size = max(desired, reported_current, len(members)) + detached_retiring
+        reservation = capacity["pending"].get(profile.key, {}) if capacity else {}
+        effective_size = max(desired, reported_current, len(members), reservation.get("target", 0)) + detached_retiring
         if effective_size > 0:
             active_profiles += 1
         total_desired_ocpus += desired * profile.ocpus
         total_effective_ocpus += effective_size * profile.ocpus
+        total_effective_vms += effective_size
         profiles.append(
             {
                 **_scale_test_profile_payload(profile),
@@ -1626,17 +1646,20 @@ def _scale_test_status(config: Config, clients: Clients, now: datetime) -> tuple
                     "currentSize": reported_current,
                     "attachedSize": len(members),
                     "effectiveSize": effective_size,
+                    "reservedTarget": reservation.get("target", 0),
                     "desiredUsableSize": desired_usable,
                     "usableSize": len(usable_instances),
                     "retiringSize": len(retiring),
                 },
                 "instances": instances,
                 "retirement": {
-                    "policy": "irreversible", "replacementPolicy": "retire_first",
+                    "policy": "irreversible", "replacementPolicy": "bounded_growth_preview" if config.bounded_growth else "retire_first",
                     "pendingInstanceIds": sorted(retiring),
                     "pending": len(retiring), "revision": registry["revision"],
                 },
                 "readiness": {
+                    "scope": "infrastructure_and_bootstrap_only",
+                    "schedulerReady": None,
                     "attached": len(members),
                     "running": running_count,
                     "bootstrapReady": ready_count,
@@ -1707,6 +1730,9 @@ def _scale_test_status(config: Config, clients: Clients, now: datetime) -> tuple
             "maxTotalOcpus": config.max_scale_test_total_ocpus,
             "totalDesiredOcpus": total_desired_ocpus,
             "totalEffectiveOcpus": total_effective_ocpus,
+            "maxTotalVms": config.max_total_vms if config.bounded_growth else None,
+            "totalEffectiveVms": total_effective_vms,
+            "boundedGrowthPreview": config.bounded_growth,
             "queuePersistence": "object_storage_request_ledger",
         },
     }
@@ -2348,6 +2374,7 @@ def _pool_converged(scope: Scope, clients: Clients, desired: int) -> tuple[bool,
         and _pool_size(scope.pool) == desired
         and reported_current == desired
         and len(members) == desired
+        and all(_mapping_value(_instance(scope, clients, _mapping_value(member, "id"))[0], "lifecycle_state") == "RUNNING" for member in members)
     )
     return complete, members, reported_current
 
@@ -2415,6 +2442,309 @@ def _superseded_reconcile_result(
     }, "superseded"
 
 
+CAPACITY_OBJECT = "coordination/bounded-capacity-v1.json"
+
+
+def _capacity_identity(config: Config) -> list[list[Any]]:
+    # A removed pool must not make its outstanding workers/reservations vanish.
+    # Enrollment/shape changes after activation therefore require a quiescent,
+    # audited migration, not an automatic reset of this record.
+    return [[key, p.pool_id, p.ocpus, p.max_size] for key, p in sorted(config.scale_test_profiles.items())]
+
+
+def _capacity_record(config: Config, clients: Clients) -> tuple[Mapping[str, Any] | None, str | None]:
+    try:
+        record, etag = _get_ledger_record(config, clients, CAPACITY_OBJECT)
+    except Exception as error:
+        if getattr(error, "status", None) == 404:
+            return None, None
+        raise
+    pending = record.get("pending")
+    sequence = record.get("sequence")
+    if (
+        record.get("version") != 1 or record.get("harnessId") != config.harness_id
+        or record.get("profiles") != _capacity_identity(config)
+        or not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 0
+        or not isinstance(pending, Mapping)
+        or any(
+            key not in config.scale_test_profiles or not isinstance(value, Mapping)
+            or not isinstance(value.get("target"), int) or isinstance(value.get("target"), bool)
+            or value["target"] < 1 or value["target"] > config.scale_test_profiles[key].max_size
+            or not isinstance(value.get("token"), str) or not UUID_RE.fullmatch(value["token"])
+            or not isinstance(value.get("createdAt"), str)
+            or not isinstance(value.get("workRequestIds"), list)
+            or any(not isinstance(item, str) for item in value["workRequestIds"])
+            for key, value in pending.items()
+        )
+    ):
+        raise HarnessError(409, "capacity_ledger_mismatch", "capacity ledger/configuration mismatch; preserve the ledger and review enrollment with an operator")
+    return record, etag
+
+
+def _put_capacity(config: Config, clients: Clients, record: Mapping[str, Any], etag: str | None) -> str:
+    return _put_ledger_record(config, clients, CAPACITY_OBJECT, record, if_match=etag, if_none_match="*" if etag is None else None)
+
+
+def _capacity_usage(config: Config, clients: Clients, capacity: Mapping[str, Any]) -> dict[str, int]:
+    """Count physical/target capacity plus unobserved reservations exactly once.
+
+    Retiring workers, including detached TERMINATING workers, still cost a VM
+    and their profile's OCPUs. Missing/ambiguous retirement observations fail
+    closed in _retirement_snapshot. Reservations have no expiry-based refund.
+    """
+    usage = {}
+    for key, candidate in config.scale_test_profiles.items():
+        scope = _resolve_scale_test_scope(candidate, config, clients)
+        members = _members(scope, clients)
+        _, retiring = _retirement_snapshot(scope, clients, candidate, members)
+        detached = len(set(retiring) - {_mapping_value(member, "id") for member in members})
+        reserved = capacity["pending"].get(key, {}).get("target", 0)
+        usage[key] = max(_pool_size(scope.pool), _reported_current_size(scope.pool, len(members)), len(members), reserved) + detached
+    return usage
+
+
+def _assert_budget_fence(config: Config, clients: Clients, request_id: str, etag: str, now: datetime) -> None:
+    record, current_etag = _get_ledger_record(config, clients, SCALE_TEST_BUDGET_LOCK_OBJECT)
+    expiry = _lease_expiry(record)
+    if current_etag != etag or record.get("owner") != request_id or expiry is None or expiry <= now:
+        raise HarnessError(409, "scale_test_budget_busy", "aggregate capacity lease changed or expired; retry after backoff", retryable=True)
+
+
+def _bounded_reconcile_once(
+    config: Config, clients: Clients, profile: ScaleTestProfile, desired: int,
+    exclusions: Sequence[str], request_id: str, generation: int, attempt_id: str,
+    now: datetime, clock: Callable[[], datetime] | None,
+) -> tuple[int, Mapping[str, Any], str]:
+    """Preview protocol: detach one exact worker, terminate separately, grow with headroom.
+
+    Requires exclusive ownership of pool sizing, membership, protection and
+    ledger writes. OCI pool mutations are still prohibited while not RUNNING.
+    Caller replays drive progress; there is no hidden background worker.
+    """
+    if not _is_latest_request(config, clients, profile, request_id, generation, desired):
+        return _superseded_reconcile_result(profile, desired, request_id, generation)
+    lease = _acquire_pool_mutation_lease(config, clients, profile, request_id, attempt_id, generation, desired, _utcnow(clock))
+    budget_etag = None
+    try:
+        budget_etag = _acquire_scale_test_budget_lock(config, clients, request_id, _utcnow(clock))
+
+        def fence() -> None:
+            _assert_pool_mutation_fence(config, clients, lease, _utcnow(clock))
+            _assert_budget_fence(config, clients, request_id, budget_etag, _utcnow(clock))
+            if not _is_latest_request(config, clients, profile, request_id, generation, desired):
+                raise HarnessError(409, "request_superseded", "a newer demand generation owns the pool", retryable=True)
+
+        capacity, capacity_etag = _capacity_record(config, clients)
+        if capacity is None:
+            capacity = {"version": 1, "harnessId": config.harness_id, "profiles": _capacity_identity(config), "sequence": 0, "pending": {}}
+            if not config.dry_run:
+                fence()
+                capacity_etag = _put_capacity(config, clients, capacity, None)
+        scope = _resolve_scale_test_scope(profile, config, clients)
+        _assert_autoscaling_removed(scope, clients)
+        current = _pool_size(scope.pool)
+        converged, members, reported = _pool_converged(scope, clients, desired)
+        _, retiring = _retirement_snapshot(scope, clients, profile, members, request_id=request_id, now=now)
+        member_ids = {_mapping_value(member, "id") for member in members}
+        usable = len(member_ids - set(retiring))
+        base = {
+            "action": "reconcile_pool", "request_id": request_id, "pool_key": profile.key,
+            "pool_id": scope.pool_id, "generation": generation, "desired_generation": generation,
+            "desired_size": desired, "desired_usable_size": desired, "size_before": current,
+            "observed_current_size": reported, "observed_attached_size": len(members),
+            "observed_usable_size": usable, "retiring_instance_ids": sorted(retiring),
+            "retiring_count": len(retiring), "replacement_policy": "bounded_growth_preview",
+            "readiness_scope": "infrastructure_only", "scheduler_ready": None,
+            "detached_instance_ids": [], "work_request_ids": [], "target_size": desired,
+            "max_total_vms": config.max_total_vms,
+        }
+
+        def result(outcome: str, *, complete: bool = False, **extra: Any) -> tuple[int, Mapping[str, Any], str]:
+            state = "completed" if complete else "submitted"
+            if extra.get("intervention_required"):
+                LOG.warning("Controller intervention required: %s", outcome)
+            if "work_request_ids" in extra:
+                extra["work_request_ids"] = list(dict.fromkeys(base["work_request_ids"] + extra["work_request_ids"]))
+            return (200 if complete else 202), {**base, "result": "dry_run" if config.dry_run else state,
+                "outcome": outcome, "size_after": reported, "shortfall": max(0, desired - usable),
+                "retryable": not complete, **extra}, state
+
+        # Cleanup can progress even when a launch's outcome is unresolved.
+        if not config.dry_run:
+            base["work_request_ids"] = _advance_detached_retirement(config, clients, scope, profile, retiring, member_ids, exclusions, fence)
+        pending = capacity["pending"].get(profile.key)
+        if pending:
+            # Re-observation, never a time-based refund. Do not issue a second
+            # update while acceptance of the first is unknown, even on new demand.
+            statuses = []
+            error_codes = []
+            if clients.work_requests is not None:
+                for work_id in pending["workRequestIds"]:
+                    try:
+                        work_status = _mapping_value(_mapping_value(clients.work_requests.get_work_request(work_id), "data"), "status")
+                    except Exception as error:
+                        converted = _service_error(error)
+                        return result("launch_diagnostics_unavailable", work_request_ids=pending["workRequestIds"],
+                                      reserved_target=pending["target"], pending_reason=converted.reason,
+                                      intervention_required=True, retryable=False)
+                    statuses.append(work_status)
+                    if work_status == "FAILED":
+                        try:
+                            errors = clients.work_requests.list_work_request_errors(work_id, limit=20)
+                        except Exception:
+                            # Keep the failure verdict even if detailed errors
+                            # have expired or the diagnostic grant is missing.
+                            error_codes.append("DiagnosticsUnavailable")
+                            continue
+                        for item in _mapping_value(errors, "data", []):
+                            code = _mapping_value(item, "code", "Unknown")
+                            # Error messages may include customer data. Return
+                            # only a bounded code; full details stay in OCI.
+                            error_codes.append(code if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", code) else "Unknown")
+            if any(value in {"FAILED", "CANCELED", "CANCELLED"} for value in statuses):
+                return result("launch_failed", work_request_ids=pending["workRequestIds"], intervention_required=True, retryable=False,
+                              pending_reason="inspect_oci_work_request_errors", work_request_error_codes=error_codes, reserved_target=pending["target"])
+            observed, _, _ = _pool_converged(scope, clients, pending["target"])
+            if observed and (not statuses or all(value == "SUCCEEDED" for value in statuses)):
+                capacity = {**capacity, "pending": {key: value for key, value in capacity["pending"].items() if key != profile.key}}
+                if not config.dry_run:
+                    fence()
+                    capacity_etag = _put_capacity(config, clients, capacity, capacity_etag)
+            else:
+                try:
+                    age = (now - datetime.fromisoformat(pending["createdAt"].replace("Z", "+00:00"))).total_seconds()
+                except (ValueError, TypeError):
+                    raise HarnessError(502, "invalid_ledger_record", "invalid launch reservation timestamp")
+                overdue = age >= config.launch_timeout_seconds
+                return result("launch_verification_required" if overdue else "launch_pending",
+                              reserved_target=pending["target"], work_request_ids=pending["workRequestIds"],
+                              intervention_required=overdue, retryable=not overdue)
+
+        if converged and not retiring:
+            return result("already_at_target", complete=True)
+        if config.dry_run:
+            usage = _capacity_usage(config, clients, capacity)
+            return result("bounded_growth_preview_only", complete=True, counted_vms=sum(usage.values()),
+                          counted_ocpus=sum(usage[key] * config.scale_test_profiles[key].ocpus for key in usage))
+
+        scope = _resolve_scale_test_scope(profile, config, clients)
+        if _mapping_value(scope.pool, "lifecycle_state") != "RUNNING":
+            return result("pool_busy", pending_reason="oci_pool_not_running")
+        # OCI can report RUNNING and a decremented target before the member
+        # list drops the detached identity. Mixing those observations creates
+        # a false deficit (and an unnecessary replacement during scale-down).
+        # Conversely, a short member list is not evidence of a free launch
+        # slot. Wait for coherent target/membership before either pool mutation.
+        if _pool_size(scope.pool) != current or len(member_ids) != current:
+            return result("pool_state_changed")
+
+        # Target means usable capacity. Attached commitments remain physical
+        # capacity but must not satisfy fresh demand. Launch replacements first
+        # when there is headroom; otherwise release one pool slot below.
+        deficit = desired - usable
+        if deficit > 0:
+            matches, message = _scale_test_configuration_check(scope, profile, clients)
+            if not matches:
+                raise HarnessError(409, "instance_configuration_mismatch", message)
+            usage = _capacity_usage(config, clients, capacity)
+            total_vms = sum(usage.values())
+            total_ocpus = sum(usage[key] * config.scale_test_profiles[key].ocpus for key in usage)
+            active = sum(count > 0 for count in usage.values())
+            slots = max(0, min(deficit, profile.max_size - usage[profile.key],
+                               config.max_total_vms - total_vms,
+                               (config.max_scale_test_total_ocpus - total_ocpus) // profile.ocpus))
+            if not usage[profile.key] and active >= config.max_active_scale_test_profiles:
+                slots = 0
+            base.update(counted_vms=total_vms, counted_ocpus=total_ocpus)
+            if not slots and not (member_ids & set(retiring)):
+                return result("capacity_pending", pending_reason="configured_capacity_guard")
+            if not slots:
+                return _bounded_detach_one(config, clients, scope, profile, exclusions, request_id, now, fence, result)
+            target = current + slots
+            sequence = capacity["sequence"] + 1
+            pending = {"target": target, "requestId": request_id, "generation": generation,
+                       "token": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{config.harness_id}:{scope.pool_id}:{sequence}:{request_id}")),
+                       "createdAt": _timestamp(now), "workRequestIds": []}
+            capacity = {**capacity, "sequence": sequence, "pending": {**capacity["pending"], profile.key: pending}}
+            fence()
+            # Global CAS makes competing reservations conflict even if a lease
+            # expires during a slow capacity scan. Persist BEFORE the OCI call.
+            capacity_etag = _put_capacity(config, clients, capacity, capacity_etag)
+            fresh = _resolve_scale_test_scope(profile, config, clients)
+            if _pool_size(fresh.pool) != current or _mapping_value(fresh.pool, "lifecycle_state") != "RUNNING":
+                return result("launch_verification_required", intervention_required=True, retryable=False)
+            fence()
+            try:
+                response = clients.pools.update_instance_pool(fresh.pool_id, _model("UpdateInstancePoolDetails", size=target),
+                                                             if_match=fresh.pool_etag, opc_retry_token=pending["token"])
+            except Exception as error:
+                converted = _service_error(error)
+                # Refund only explicit pre-admission rejections. Transport/5xx
+                # and unclassified failures retain their reservation indefinitely.
+                if getattr(error, "status", None) in {400, 401, 403, 404, 409, 412, 429}:
+                    cleared = {**capacity, "pending": {key: value for key, value in capacity["pending"].items() if key != profile.key}}
+                    _put_capacity(config, clients, cleared, capacity_etag)
+                    raise converted from error
+                return result("scale_out_outcome_unknown", target_size=target, reserved_target=target,
+                              pending_reason=converted.reason)
+            work_ids = [value for value in (_work_request_id(response),) if value]
+            capacity["pending"][profile.key] = {**pending, "workRequestIds": work_ids}
+            _put_capacity(config, clients, capacity, capacity_etag)
+            return result("scale_out_submitted", target_size=target, reserved_target=target, work_request_ids=work_ids)
+
+        if retiring or current > desired:
+            if not config.enable_termination:
+                return result("termination_disabled", intervention_required=True, retryable=False)
+            return _bounded_detach_one(config, clients, scope, profile, exclusions, request_id, now, fence, result)
+        return result("convergence_pending")
+    finally:
+        if budget_etag is not None:
+            _release_scale_test_budget_lock(config, clients, request_id, budget_etag)
+        _release_pool_mutation_lease(config, clients, lease)
+
+
+def _advance_detached_retirement(config, clients, scope, profile, retiring, member_ids, exclusions, fence):
+    """Advance one committed detached identity; scope, tag and ETag fail closed."""
+    if not config.enable_termination:
+        return []
+    for instance_id in sorted(set(retiring) - member_ids):
+        if instance_id in exclusions:
+            continue
+        instance, instance_etag = _instance(scope, clients, instance_id)
+        if _mapping_value(instance, "lifecycle_state") in {"TERMINATING", "TERMINATED"}:
+            continue
+        tags = _tags(instance)
+        if tags.get(PROTECTION_TAG) != "0" or tags.get(HARNESS_TAG) != config.harness_id or tags.get(SCALE_TEST_PROFILE_TAG) != profile.key:
+            continue
+        if _member_by_id(_members(scope, clients), instance_id) is not None:
+            continue
+        fence()
+        response = clients.compute.terminate_instance(instance_id, preserve_boot_volume=False, if_match=instance_etag)
+        return [value for value in (_work_request_id(response),) if value]
+    return []
+
+
+def _bounded_detach_one(config, clients, scope, profile, exclusions, request_id, now, fence, result):
+    """One exact irreversible retirement per replay; never bulk shrink."""
+    if not config.enable_termination:
+        return result("termination_disabled", intervention_required=True, retryable=False)
+    candidates = _eligible_scale_in_candidates(scope, clients, profile, exclusions, _members(scope, clients))
+    if candidates:
+        instance_id = candidates[0][1]
+        registry = _write_retirement(scope, clients, instance_id, request_id, now)
+        # Protection is not an atomic precondition of OCI detach. Exclusive
+        # tag/membership writers remain mandatory despite this final re-read.
+        fresh = _resolve_scale_test_scope(profile, config, clients)
+        _assert_autoscaling_removed(fresh, clients)
+        candidates = _eligible_scale_in_candidates(fresh, clients, profile, exclusions, _members(fresh, clients))
+        if _mapping_value(fresh.pool, "lifecycle_state") == "RUNNING" and _pool_size(fresh.pool) > 0 and instance_id in {value for _, value in candidates}:
+            fence()
+            response = _detach(fresh, clients, instance_id, registry["instances"][instance_id]["detachRetryToken"], auto_terminate=False)
+            return result("retirement_detached", detached_instance_ids=[instance_id],
+                          work_request_ids=[value for value in (_work_request_id(response),) if value])
+    return result("retirement_pending")
+
+
 def _reconcile_once(
     config: Config,
     clients: Clients,
@@ -2443,6 +2773,14 @@ def _reconcile_once(
     are re-read so stale invocations fail closed.
     """
 
+    if config.bounded_growth:
+        return _bounded_reconcile_once(config, clients, profile, desired, exclusions, request_id, generation, attempt_id, now, clock)
+    if config.controller_only and not config.dry_run:
+        # Once the new protocol owns this ledger, a configuration rollback may
+        # not ignore unresolved launch reservations or detached workers.
+        capacity, _ = _capacity_record(config, clients)
+        if capacity is not None:
+            raise HarnessError(409, "capacity_protocol_required", "this ledger uses bounded growth; do not disable the protocol or roll back its image without an operator migration")
     if not _is_latest_request(config, clients, profile, request_id, generation, desired):
         return _superseded_reconcile_result(profile, desired, request_id, generation)
 
@@ -2472,6 +2810,8 @@ def _reconcile_once(
         "retiring_instance_ids": sorted(retiring),
         "retiring_count": len(retiring),
         "replacement_policy": "retire_first",
+        "readiness_scope": "infrastructure_only",
+        "scheduler_ready": None,
     }
 
     # No-op/status polling is intentionally lock-free. This is what allows a
@@ -3028,6 +3368,10 @@ def _reconcile_pool(
         return response_status, rejected
     except Exception as error:
         converted = _service_error(error)
+        # Record bounded diagnostic metadata, never SDK messages/headers,
+        # request payloads or credential-bearing exception representations.
+        LOG.error("Reconcile exception type=%s classification=%s",
+                  type(error).__name__, converted.reason)
         durable_state = (
             "submitted"
             if converted.retryable and previous_state == "submitted"
@@ -3124,7 +3468,7 @@ def _set_pool_protection(
     instance_id = _request_field(payload, "instance_id", "instanceId")
     instance_id = _validate_ocid(instance_id, "instance", "instance_id")
     raw_value = _request_field(payload, "tag_value", "tagValue")
-    if raw_value not in {"0", "1"}:
+    if not isinstance(raw_value, str) or raw_value not in {"0", "1"}:
         raise HarnessError(400, "invalid_protection_value", "tag_value must be exactly the string 0 or 1")
     scope = _resolve_scale_test_scope(profile, config, clients)
     if _member_by_id(_members(scope, clients), instance_id) is None:
@@ -3711,6 +4055,7 @@ def _make_clients() -> Clients:
         pools=oci.core.ComputeManagementClient({}, signer=signer),
         objects=oci.object_storage.ObjectStorageClient({}, signer=signer),
         autoscaling=oci.autoscaling.AutoScalingClient({}, signer=signer),
+        work_requests=oci.work_requests.WorkRequestClient({}, signer=signer),
     )
 
 
@@ -3725,6 +4070,12 @@ def _service_error(error: Exception) -> HarnessError:
 
     status = getattr(error, "status", None)
     code = str(getattr(error, "code", "") or "")
+    if code in {"LimitExceeded", "QuotaExceeded"}:
+        return HarnessError(409, "oci_capacity_limit", "OCI rejected capacity due to a service limit or quota; review the limit before submitting a new generation")
+    if code in {"OutOfHostCapacity", "OutOfCapacity"}:
+        return HarnessError(409, "oci_capacity_unavailable", "OCI has no capacity for this placement; review placement and submit a new generation")
+    if status == 400:
+        return HarnessError(400, "oci_invalid_request", "OCI rejected the request parameters; correct the configuration before submitting a new generation")
     if status == 412:
         return HarnessError(
             409,
@@ -3757,7 +4108,8 @@ def _service_error(error: Exception) -> HarnessError:
             "OCI rejected the requested state transition; re-read current state and retry with bounded jitter",
             retryable=True,
         )
-    if status in {408, 500, 502, 503, 504} or any(
+    sdk_request_error = getattr(getattr(oci, "exceptions", None), "RequestException", None)
+    if (isinstance(sdk_request_error, type) and isinstance(error, sdk_request_error)) or status in {408, 500, 502, 503, 504} or any(
         marker in type(error).__name__.lower() for marker in ("timeout", "connection")
     ):
         return HarnessError(502, "oci_transient_error", "OCI service request failed transiently", retryable=True)

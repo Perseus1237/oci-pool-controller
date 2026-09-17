@@ -1,9 +1,9 @@
 {
   "files": [
     {
-      "bytes": 181,
+      "bytes": 189,
       "path": ".gitignore",
-      "sha256": "8c519c3837c70dbe765c5218dc15c2ff9346692f97a7c89fecc2503ce4033c1c"
+      "sha256": "6adde9575331cfaf5e3fd6e65adc42a948a31e161393ce14f31ac4ca9faaabd9"
     },
     {
       "bytes": 1328,
@@ -11,9 +11,9 @@
       "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
     },
     {
-      "bytes": 15355,
+      "bytes": 16209,
       "path": "deploy/reference/main.tf",
-      "sha256": "ad1195d5aaf632ca282e486de4aec331d010ed043b9d5c004ed4c7f8e6892896"
+      "sha256": "429ea443799ea6dc6e2452c908ec9fa00f942cac964e00e9d628d4ac8518906c"
     },
     {
       "bytes": 2191,
@@ -21,24 +21,24 @@
       "sha256": "6313a8ab2bd9e02e81493d7e12443ee7e408e33aed9df892877079b7a7b9a1fa"
     },
     {
-      "bytes": 31783,
+      "bytes": 32802,
       "path": "deploy/reference/README.md",
-      "sha256": "deaff7478bb2a329ab569fb60b8dfc9d1757000355c79f960265b418da0fd691"
+      "sha256": "7f9b4277b184bf8508d6318f5740480e7f8c034778a8d0b4af9886dc47b6e79c"
     },
     {
       "path": "deploy/reference/schema.yaml",
-      "bytes": 9981,
-      "sha256": "1fb9b610e98ca97cab5ad0eb33ab3d2b49542035e1cc4f6fcc05fb157089471d"
+      "bytes": 10866,
+      "sha256": "5f454de3ede4100aa2eb23b701216fe26dafff8bfd1c105b43911f7d468a4132"
     },
     {
-      "bytes": 3764,
+      "bytes": 4031,
       "path": "deploy/reference/terraform.tfvars.example",
-      "sha256": "73501f5a009dfea3bd5d9261179ea0a8da22470da3d7070390e8f0e6e02ce137"
+      "sha256": "f1bc2ee234b4ba6da1091ee59584ab9ae9417ec976e67971bf99ae41d8c972b7"
     },
     {
-      "bytes": 11777,
+      "bytes": 12977,
       "path": "deploy/reference/variables.tf",
-      "sha256": "e02efb940f9a2c6ea31589a1dad7e2dc1ff0f22aee3b0674bd1ac2ebea6115be"
+      "sha256": "169474c00302efde413e0ad2ba2fd795158308586d8b79be06fde0b29c50d36b"
     },
     {
       "bytes": 590,
@@ -56,14 +56,14 @@
       "sha256": "cf0d479beb49973d59cf650b10412af63083a2d01b98a5423f4aa1e4fbd98f3f"
     },
     {
-      "bytes": 20527,
+      "bytes": 21232,
       "path": "docs/RUNBOOK.md",
-      "sha256": "3b2d653ebeeeddfa9854725365e330c56e8d8e0de388cc839d8e91a1d2c6fc55"
+      "sha256": "b7ff0f7041c448d0b847dbef4240a7c789653eb14ec69d87c8952c7db8951fff"
     },
     {
-      "bytes": 15536,
+      "bytes": 15786,
       "path": "examples/pool_controller.py",
-      "sha256": "bc9d33005e60c6e969762a327834594bc2b2399c3c452c7f7706763c8e395294"
+      "sha256": "a1d21e957a85387e05225642d19db7681ffd6a2a5fad704dd3e59a49f6f6261a"
     },
     {
       "bytes": 7472,
@@ -81,9 +81,9 @@
       "sha256": "ea68ddf0cb744ee92ebada5a981c6a1a3f083cfd815e13d89b19bba4dcc56ed1"
     },
     {
-      "bytes": 167060,
+      "bytes": 190441,
       "path": "function/func.py",
-      "sha256": "21fed5907d3b7237b6c8fc6f884bca08b4bede4ce640f01906fac95bf78128e6"
+      "sha256": "f1e227bdf34dfa073953929ea0fb19fa45623ca51b0958f371276afcb3a951bc"
     },
     {
       "bytes": 26,
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 21406,
+      "bytes": 22046,
       "path": "README.md",
-      "sha256": "e46646261358b7dace7673f52d23d67475a69dc396c340af6c7865a78afcd2f9"
+      "sha256": "123712358e9427832d245b661c1286d54982f121f609f8a89af463c3db77df97"
     },
     {
       "bytes": 2889,
@@ -137,8 +137,8 @@
     },
     {
       "path": "tests/test_resource_manager_deployment.py",
-      "bytes": 16403,
-      "sha256": "5e9f9fe1ea2d873d9b9d1eaac89927fa77951b325aa2da910688c742dac03950"
+      "bytes": 17986,
+      "sha256": "d8d4aea4856e9df0d633ab96c740047554e19e91377a33b4f25105e77a4f2277"
     },
     {
       "path": "deploy/reference/enrollment.tf",
@@ -164,6 +164,26 @@
       "path": "tests/test_caller_groups.py",
       "bytes": 6702,
       "sha256": "315235bf0f73c8c2acecfe8185336ab98e274894107e08495c00e86996d5f5ac"
+    },
+    {
+      "path": "docs/BOUNDED_GROWTH_ACCEPTANCE.md",
+      "bytes": 11928,
+      "sha256": "474729d31532ec65fda3bc7cd9595c93de7e7ffa2da235c993abb5c10b682b7c"
+    },
+    {
+      "path": "tests/controller_fakes.py",
+      "bytes": 21026,
+      "sha256": "95b290bd115e576152cd0eaf2d58e6658844e35ca4cb3a68e492a731c7f97528"
+    },
+    {
+      "path": "tests/test_controller_acceptance.py",
+      "bytes": 32232,
+      "sha256": "0e5dffbeb3370640d2c2b100d89eb0a76a45795b8c26ecced21a1623c3d1d15b"
+    },
+    {
+      "path": "docs/LIVE_ACCEPTANCE_20260917.md",
+      "bytes": 15529,
+      "sha256": "72d79c05920e5b67a01fab0528cf20f4641b89c0bb573bb8b9bd4dd4cd258a13"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",

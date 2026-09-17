@@ -92,6 +92,10 @@ locals {
     "Allow dynamic-group ${local.dynamic_group_name} to manage instances in compartment id ${var.pool_compartment_ocid} where request.permission = 'INSTANCE_CREATE'",
     "Allow dynamic-group ${local.dynamic_group_name} to read instance-images in compartment id ${var.pool_compartment_ocid}",
     "Allow dynamic-group ${local.dynamic_group_name} to use vnics in compartment id ${var.pool_compartment_ocid}",
+    # Pool scale-out checks launch permissions in the instance compartment;
+    # actual VNICs reside in the subnet's compartment when these differ.
+    "Allow dynamic-group ${local.dynamic_group_name} to use subnets in compartment id ${var.pool_compartment_ocid} where request.permission = 'SUBNET_ATTACH'",
+    "Allow dynamic-group ${local.dynamic_group_name} to use vnics in compartment id ${var.network_compartment_ocid} where ANY {request.permission = 'VNIC_READ', request.permission = 'VNIC_CREATE', request.permission = 'VNIC_ATTACH', request.permission = 'VNIC_DETACH', request.permission = 'VNIC_DELETE'}",
     "Allow dynamic-group ${local.dynamic_group_name} to use subnets in compartment id ${var.network_compartment_ocid}",
     "Allow dynamic-group ${local.dynamic_group_name} to read instances in compartment id ${var.pool_compartment_ocid}",
     "Allow dynamic-group ${local.dynamic_group_name} to use instances in compartment id ${var.pool_compartment_ocid} where request.permission = 'INSTANCE_UPDATE'",
@@ -170,23 +174,26 @@ resource "oci_functions_application" "controller" {
 
 locals {
   function_config = {
-    CONTROLLER_ONLY                  = "true"
-    AUTH_MODE                        = "oci_iam"
-    FUNCTION_ROLE                    = "control"
-    COMPARTMENT_OCID                 = local.target_pool_compartment_id
-    ALLOW_EMPTY_POOL_REGISTRY        = tostring(!local.enrollment_requested)
-    HARNESS_ID                       = module.enrollment.scope_id
-    DRY_RUN                          = tostring(var.dry_run)
-    ENABLE_TERMINATION               = tostring(var.enable_termination)
-    FLAG_TAG_KEY                     = "InstanceTerminationProtectionEnabled"
-    SCALE_TEST_PROFILES_JSON         = jsonencode(local.profiles)
-    CONTROLLER_MAX_PROFILES          = tostring(var.max_profiles)
-    CONTROLLER_MAX_POOL_SIZE         = tostring(var.max_pool_size)
-    SCALE_TEST_BUDGET_LIMITS_ENABLED = "true"
-    MAX_ACTIVE_SCALE_TEST_PROFILES   = tostring(var.max_active_pools)
-    MAX_SCALE_TEST_TOTAL_OCPUS       = tostring(var.max_total_ocpus)
-    OBJECT_STORAGE_NAMESPACE         = data.oci_objectstorage_namespace.current.namespace
-    REQUEST_LEDGER_BUCKET            = oci_objectstorage_bucket.ledger.name
+    CONTROLLER_ONLY                   = "true"
+    AUTH_MODE                         = "oci_iam"
+    FUNCTION_ROLE                     = "control"
+    COMPARTMENT_OCID                  = local.target_pool_compartment_id
+    ALLOW_EMPTY_POOL_REGISTRY         = tostring(!local.enrollment_requested)
+    HARNESS_ID                        = module.enrollment.scope_id
+    DRY_RUN                           = tostring(var.dry_run)
+    ENABLE_TERMINATION                = tostring(var.enable_termination)
+    ENABLE_BOUNDED_GROWTH             = tostring(var.enable_bounded_growth)
+    CONTROLLER_MAX_TOTAL_VMS          = tostring(var.max_total_vms)
+    CONTROLLER_LAUNCH_TIMEOUT_SECONDS = tostring(var.launch_timeout_seconds)
+    FLAG_TAG_KEY                      = "InstanceTerminationProtectionEnabled"
+    SCALE_TEST_PROFILES_JSON          = jsonencode(local.profiles)
+    CONTROLLER_MAX_PROFILES           = tostring(var.max_profiles)
+    CONTROLLER_MAX_POOL_SIZE          = tostring(var.max_pool_size)
+    SCALE_TEST_BUDGET_LIMITS_ENABLED  = "true"
+    MAX_ACTIVE_SCALE_TEST_PROFILES    = tostring(var.max_active_pools)
+    MAX_SCALE_TEST_TOTAL_OCPUS        = tostring(var.max_total_ocpus)
+    OBJECT_STORAGE_NAMESPACE          = data.oci_objectstorage_namespace.current.namespace
+    REQUEST_LEDGER_BUCKET             = oci_objectstorage_bucket.ledger.name
   }
 }
 

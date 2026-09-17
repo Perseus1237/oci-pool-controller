@@ -54,6 +54,27 @@ def group_lines(schema, title):
 
 
 class ResourceManagerDeploymentTests(unittest.TestCase):
+    def test_cross_compartment_pool_launch_has_preflight_and_vnic_permissions(self):
+        main = (ROOT / "deploy/reference/main.tf").read_text(encoding="utf-8")
+        self.assertIn("use vnics in compartment id ${var.pool_compartment_ocid}", main)
+        self.assertIn("use subnets in compartment id ${var.pool_compartment_ocid} where request.permission = 'SUBNET_ATTACH'", main)
+        network_vnic_line = next(line for line in main.splitlines()
+                                if "use vnics in compartment id ${var.network_compartment_ocid}" in line)
+        for permission in ("VNIC_READ", "VNIC_CREATE", "VNIC_ATTACH", "VNIC_DETACH", "VNIC_DELETE"):
+            self.assertIn("'" + permission + "'", network_vnic_line)
+        self.assertNotIn("VNIC_UPDATE", network_vnic_line)
+
+    def test_bounded_growth_is_opt_in_with_explicit_vm_and_timeout_guards(self):
+        schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
+        self.assertIs(default_value(schema, "enable_bounded_growth"), False)
+        self.assertEqual(default_value(schema, "max_total_vms"), 25)
+        self.assertEqual(default_value(schema, "launch_timeout_seconds"), 900)
+        main = (ROOT / "deploy/reference/main.tf").read_text(encoding="utf-8")
+        for env, variable in [("ENABLE_BOUNDED_GROWTH", "enable_bounded_growth"),
+                              ("CONTROLLER_MAX_TOTAL_VMS", "max_total_vms"),
+                              ("CONTROLLER_LAUNCH_TIMEOUT_SECONDS", "launch_timeout_seconds")]:
+            self.assertRegex(main, env + r"\s*=\s*tostring\(var\." + variable + r"\)")
+
     def setUp(self):
         self.values = {
             "function_image": "iad.ocir.io/testnamespace/controller:release-1",

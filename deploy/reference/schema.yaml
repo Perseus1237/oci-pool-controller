@@ -28,7 +28,7 @@ variableGroups:
       and: ["${enroll_pools}", "${auto_discover_pools}"]
     variables: [customize_pool_settings, pool_overrides]
   - title: Safety and capacity
-    variables: [dry_run, enable_termination, max_profiles, max_pool_size, max_active_pools, max_total_ocpus]
+    variables: [dry_run, enable_termination, enable_bounded_growth, max_total_vms, launch_timeout_seconds, max_profiles, max_pool_size, max_active_pools, max_total_ocpus]
   - title: IAM and resource naming
     variables: [create_iam_resources, configure_caller_groups, invoker_group_ocids, name_prefix, dynamic_group_name, ledger_bucket_name]
 variables:
@@ -194,6 +194,23 @@ variables:
     type: boolean
     default: true
     title: Dry-run (keep enabled for initial validation)
+  enable_bounded_growth:
+    type: boolean
+    default: false
+    title: Bounded-growth preview (requires staging acceptance)
+    description: Keep disabled for production pending live reburst acceptance. Requires exclusive pool/protection writers and irreversible worker drain. Activation requires migration before disabling or changing enrollment.
+  max_total_vms:
+    type: number
+    default: 25
+    minimum: 1
+    title: Aggregate VM cap (bounded-growth preview)
+    description: Includes pending launches and retiring workers. This is not the OCI daily creation limit.
+  launch_timeout_seconds:
+    type: number
+    default: 900
+    minimum: 1
+    title: Launch observation deadline (seconds)
+    description: Unresolved launches require operator review after this interval; capacity is never automatically refunded.
   enable_termination:
     type: boolean
     default: false
