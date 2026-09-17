@@ -3381,6 +3381,14 @@ def _reconcile_pool(
             clock,
         )
     except HarnessError as error:
+        if error.reason == "request_superseded":
+            # Losing to newer demand is a normal terminal outcome, including
+            # races after the initial latest-generation check. Preserve prior
+            # submissions; supersession never cancels or refunds their work.
+            status, body, durable_state = _superseded_reconcile_result(profile, desired, request_id, generation)
+            response_body = dict(_merge_request_history(record, {**body, "request_state": durable_state}))
+            _store_request_result(config, clients, record, etag, status, response_body, now, state=durable_state)
+            return status, response_body
         durable_state = (
             "submitted"
             if error.retryable and previous_state == "submitted"

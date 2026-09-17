@@ -485,6 +485,87 @@ class ControllerAcceptance(unittest.TestCase):
         self.assertFalse(self.clients.pools.update_calls)
         self.assertIn(body.get("outcome", body.get("reason")), {"superseded", "stale_generation"}, body)
 
+    def test_newer_demand_winning_before_lease_reports_superseded_and_replays(self):
+        original = func._acquire_pool_mutation_lease
+        successor = {}
+        def race(config, clients, profile, request_id, attempt_id, generation, desired, now):
+            if generation == 1:
+                successor["reply"] = self.demand(8, 2)
+                successor["capacity"] = copy.deepcopy(self.clients.objects.get_json(func.CAPACITY_OBJECT))
+            return original(config, clients, profile, request_id, attempt_id, generation, desired, now)
+        # The old request passed its initial latest-generation check, but a
+        # newer invocation completes before the old one acquires the lease.
+        with patch.object(func, "_acquire_pool_mutation_lease", side_effect=race):
+            status, body = self.demand(2, 1)
+        self.assertEqual(successor["reply"][1]["outcome"], "scale_out_submitted")
+        self.assertEqual((status, body["result"], body["request_state"]), (200, "superseded", "superseded"), body)
+        self.assertFalse(body["retryable"])
+        record = self.clients.objects.get_json(func._request_object_name(body["request_id"]))
+        self.assertEqual((record["state"], record["httpStatus"]), ("superseded", 200))
+        replay_status, replay = self.demand(2, 1)
+        self.assertEqual((replay_status, replay["result"]), (200, "superseded"))
+        self.assertTrue(replay["idempotent_replay"])
+        status_code, observed = self.invoke({"action": "request_status", "request_id": body["request_id"]})
+        self.assertEqual((status_code, observed["request_state"]), (200, "superseded"))
+        self.assertEqual(self.clients.objects.get_json(func.CAPACITY_OBJECT), successor["capacity"])
+        self.assertEqual([call[1].size for call in self.clients.pools.update_calls], [8])
+        self.assertFalse(self.clients.pools.detach_calls)
+
+    def test_supersession_race_preserves_prior_submissions_and_successor_accounting(self):
+        for operation in ("launch", "detach", "unknown_launch"):
+            with self.subTest(operation=operation):
+                self.setUp()
+                if operation == "detach":
+                    self.protect("0", SCALE_NEWEST_INSTANCE_ID)
+                if operation == "unknown_launch":
+                    self.clients.pools.update_failures.append(TimeoutError("launch response lost"))
+                target = 2 if operation == "detach" else 5
+                _, prior = self.demand(target, 1)
+                original = func._acquire_pool_mutation_lease
+                successor = {}
+                def race(config, clients, profile, request_id, attempt_id, generation, desired, now):
+                    if generation == 1:
+                        successor["reply"] = self.demand(8, 2)
+                        # Capture every coordination/retirement object after
+                        # the newer request; finishing the old response must
+                        # not change any of them.
+                        successor["objects"] = copy.deepcopy(self.clients.objects.objects)
+                    return original(config, clients, profile, request_id, attempt_id, generation, desired, now)
+                with patch.object(func, "_acquire_pool_mutation_lease", side_effect=race):
+                    status, body = self.demand(target, 1)
+                self.assertEqual(successor["reply"][1]["outcome"],
+                                 "launch_pending" if operation == "unknown_launch" else "scale_out_submitted")
+                self.assertEqual((status, body["result"]), (200, "superseded"), body)
+                for field in ("detached_instance_ids", "work_request_ids"):
+                    self.assertTrue(set(prior.get(field, [])) <= set(body.get(field, [])))
+                old_record = func._request_object_name(body["request_id"])
+                for name, value in successor["objects"].items():
+                    if name != old_record:
+                        self.assertEqual(self.clients.objects.objects[name], value, name)
+                counts = (len(self.clients.pools.update_calls), len(self.clients.pools.detach_calls), len(self.clients.compute.terminate_calls))
+                _, replay = self.demand(target, 1)
+                self.assertEqual(replay["result"], "superseded")
+                self.assertEqual(counts, (len(self.clients.pools.update_calls), len(self.clients.pools.detach_calls), len(self.clients.compute.terminate_calls)))
+
+    def test_retryable_supersession_signal_is_terminal_not_queued(self):
+        with patch.object(func, "_acquire_pool_mutation_lease", side_effect=func.HarnessError(
+                409, "request_superseded", "newer demand won", retryable=True)):
+            status, body = self.demand(8)
+        self.assertEqual((status, body["result"], body["request_state"]), (200, "superseded", "superseded"), body)
+        self.assertFalse(body["retryable"])
+        self.assertFalse(self.clients.pools.update_calls)
+
+    def test_other_lease_errors_are_not_mislabeled_as_supersession(self):
+        for retryable, expected_status, expected_state in [(True, 202, "queued"), (False, 502, "failed")]:
+            with self.subTest(retryable=retryable):
+                self.setUp()
+                reason = "pool_mutation_busy" if retryable else "invalid_ledger_record"
+                with patch.object(func, "_acquire_pool_mutation_lease", side_effect=func.HarnessError(
+                        502, reason, "not supersession", retryable=retryable)):
+                    status, body = self.demand(8)
+                self.assertEqual((status, body["result"], body["outcome"]), (expected_status, expected_state, reason))
+                self.assertFalse(self.clients.pools.update_calls)
+
     def test_legacy_behavior_remains_retire_first(self):
         self.env["ENABLE_BOUNDED_GROWTH"] = "false"
         self.detached(1)
