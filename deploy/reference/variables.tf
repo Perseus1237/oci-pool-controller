@@ -87,7 +87,7 @@ variable "create_build_iam_resources" {
 }
 
 variable "ocir_username" {
-  description = "OCI username including identity domain (for example Default/user@example.com). Publishes packaged source to its private OCI code repository; namespace is added automatically. Variable name retained for compatibility."
+  description = "OCI username including identity domain (for example Default/user@example.com). Publishes packaged source to its private OCI code repository; tenancy name is added automatically. Variable name retained for compatibility."
   type        = string
   default     = ""
 }

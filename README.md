@@ -20,11 +20,17 @@ Terraform configuration and `schema.yaml`; it is why Resource Manager renders
 the deployment inputs instead of treating the repository root as a stack.
 
 The form asks for the controller, network, and OCIR compartments; the Function
-VCN and subnet; an OCIR username and auth token; IAM options; and the optional
+VCN and subnet; an OCI username and auth token; IAM options; and the optional
 dedicated Object Storage ledger-bucket name. Leave **Enroll existing pools now**
 unchecked to deploy the Function first. No existing pool or enrollment tags are
-required for this default. During **Apply**, the stack creates a private OCIR repository,
-builds the included Function source, pushes its image, and deploys the Function.
+required for this default. During **Apply**, the stack creates a private OCIR
+repository and a native x86 OCI DevOps build pipeline. The token publishes only
+the allowlisted source/build files to a private OCI code repository; it is never
+sent to the build runner. The pipeline builds and verifies a `linux/amd64` image,
+delivers it to OCIR using its scoped resource principal, and the stack deploys
+the `GENERIC_X86` Function pinned to the resulting digest. Automatic builds
+require the scoped build IAM described in the deployment guide, separately from
+the optional controller-runtime IAM.
 You do not need to build an image or create a repository before clicking the
 button. Opening the button only opens the form; it does not deploy resources.
 

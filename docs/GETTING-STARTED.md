@@ -52,7 +52,7 @@ Reuse approved networking when available. Otherwise, ask the network owner to cr
 5. Add a NAT gateway, approved proxy or other egress path only if workers or other components need public repositories or external services. A Service Gateway is not general internet access.
 6. Prepare an appropriate worker subnet before creating pools. It can use the same VCN; separate Function and worker subnets make ownership and access rules clearer.
 
-The Function's private subnet does **not** itself make its invocation endpoint private. Also, the Resource Manager image build runs on its own build host, not inside this Function subnet. Fixing subnet routing does not fix a build-host architecture problem.
+The Function's private subnet does **not** itself make its invocation endpoint private. The native DevOps image build uses a separate managed runner, not this Function subnet. Fixing subnet routing does not fix a build-host architecture problem.
 
 **Checkpoint:** network owner confirms routes, DNS, available IPs and security rules. Later authenticated Function calls must verify actual service access; looking at routes alone is not an end-to-end test. See [Oracle Service Gateway guidance](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/service-gateway_management.htm) and [Function network security groups](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionsusingnsgs.htm).
 
@@ -81,7 +81,7 @@ There are four separate permission paths. Giving the operator access to Resource
 4. If using existing caller groups, enter their **group OCIDs**, not names or user OCIDs. With no approved invoker configured, deployment does not grant a new caller access.
 5. Allow IAM propagation and perform a signed invocation. Review and update runtime IAM again when enrolling pools and when enabling termination.
 
-**Stack-managed IAM path:** an authorized administrator can opt into IAM creation, but first correct and validate the module's home-region provider handling. The reviewed source does not safely handle our Phoenix deployment/Ashburn home-region combination as published.
+**Stack-managed IAM path:** an authorized administrator can opt into runtime IAM creation. The candidate discovers the tenancy home region and uses that endpoint for IAM writes. The current Ashburn test alone does not qualify a Phoenix deployment/Ashburn home-region combination; retain that separate acceptance case.
 
 Custom worker images, subnets, encrypted volumes or keys in other compartments can require additional specific permissions. Do not solve dependency failures with tenancy-wide `manage all-resources`. Runtime Compute permissions are compartment-scoped; the controller's fixed pool allowlist is an additional application boundary, not per-pool IAM isolation.
 
@@ -110,6 +110,9 @@ IAM. The build verifies packaged checksums, native x86 and `linux/amd64` output,
 then Terraform waits for delivery and pins the Function to the delivered digest.
 `create_build_iam_resources=true` creates build-only IAM in the tenancy home
 region. This is separate from controller runtime IAM and grants no Compute access.
+Only this pipeline receives the grants: exact-source read, compartment-scoped
+DevOps artifact metadata read and OCIR repository metadata inspect, plus image
+read/update restricted to its one private OCIR repository.
 Automated builder tests do not establish end-to-end one-click success: retain
 the exact revision, successful build/push, deployed digest and signed invocation
 results from a real Resource Manager Apply before making that claim.
@@ -117,8 +120,9 @@ results from a real Resource Manager Apply before making that claim.
 If Apply already created the ledger, repository, application or logs and then
 failed during image build, **update that existing stack**, keeping its state and
 variables. Review a fresh Plan before applying; do not delete/recreate those
-resources or click the deploy button to recover them. A failure before login
-does not validate the OCIR token. See the
+resources or click the deploy button to recover them. A failure before source
+publication does not validate the auth token; image delivery separately tests
+the pipeline's OCIR permissions. See the
 [build and recovery instructions](../deploy/reference/README.md#default-build-during-resource-manager-apply).
 
 ### Path B: existing reviewed controller image

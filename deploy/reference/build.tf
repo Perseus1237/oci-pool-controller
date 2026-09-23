@@ -20,9 +20,9 @@ resource "oci_devops_repository" "function" {
   project_id      = oci_devops_project.function[0].id
   name            = "controller-source"
   repository_type = "HOSTED"
-  default_branch  = "main"
-  description     = "Allowlisted Function and build files from the applied stack"
-  freeform_tags   = local.tags
+  # Let OCI own its canonical default branch; the build pins an explicit branch.
+  description   = "Allowlisted Function and build files from the applied stack"
+  freeform_tags = local.tags
 }
 
 resource "oci_devops_build_pipeline" "function" {
@@ -82,8 +82,14 @@ resource "oci_identity_dynamic_group" "build" {
 locals {
   build_policy_statements = var.build_function_image ? [
     "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to read devops-repository in compartment id ${var.controller_compartment_ocid} where target.repository.id = '${oci_devops_repository.function[0].id}'",
-    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to read devops-deploy-artifact in compartment id ${var.controller_compartment_ocid} where target.artifact.id = '${oci_devops_deploy_artifact.function[0].id}'",
-    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to manage repos in compartment id ${var.registry_compartment_ocid} where all {target.repo.name = '${oci_artifacts_container_repository.function[0].display_name}', any {request.permission = 'REPOSITORY_READ', request.permission = 'REPOSITORY_UPDATE'}}",
+    # Delivery rejected the exact-artifact conditional read in live testing.
+    # Metadata access is compartment-scoped; artifact mutation is not granted.
+    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to read devops-deploy-artifact in compartment id ${var.controller_compartment_ocid}",
+    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to inspect repos in compartment id ${var.registry_compartment_ocid}",
+    # Keep each allowed permission in a separate flat condition. These are
+    # equivalent exact-repository grants, not repository-wide manage access.
+    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to manage repos in compartment id ${var.registry_compartment_ocid} where all {target.repo.name = '${oci_artifacts_container_repository.function[0].display_name}', request.permission = 'REPOSITORY_READ'}",
+    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to manage repos in compartment id ${var.registry_compartment_ocid} where all {target.repo.name = '${oci_artifacts_container_repository.function[0].display_name}', request.permission = 'REPOSITORY_UPDATE'}",
   ] : []
 }
 
@@ -97,19 +103,19 @@ resource "oci_identity_policy" "build" {
   depends_on     = [oci_identity_dynamic_group.build]
 }
 
-resource "oci_devops_build_pipeline_stage" "iam_propagation" {
-  count                     = var.build_function_image ? 1 : 0
-  build_pipeline_id         = oci_devops_build_pipeline.function[0].id
-  build_pipeline_stage_type = "WAIT"
-  display_name              = "Allow scoped IAM propagation"
-  build_pipeline_stage_predecessor_collection {
-    items { id = oci_devops_build_pipeline.function[0].id }
+# DevOps fetches build_spec.yaml before entering any pipeline stage. A WAIT
+# stage cannot cover first-use IAM propagation, so delay submission itself.
+resource "terraform_data" "build_iam_ready" {
+  count = var.build_function_image && var.create_build_iam_resources ? 1 : 0
+  triggers_replace = {
+    policy_id   = oci_identity_policy.build[0].id
+    policy_hash = sha256(jsonencode(local.build_policy_statements))
+    group_rule  = oci_identity_dynamic_group.build[0].matching_rule
   }
-  wait_criteria {
-    wait_type     = "ABSOLUTE_WAIT"
-    wait_duration = "PT120S"
+  provisioner "local-exec" {
+    command = "python3 -c 'import time; time.sleep(180)'"
   }
-  freeform_tags = local.tags
+  depends_on = [oci_identity_policy.build]
 }
 
 resource "oci_devops_build_pipeline_stage" "build" {
@@ -117,13 +123,14 @@ resource "oci_devops_build_pipeline_stage" "build" {
   build_pipeline_id                  = oci_devops_build_pipeline.function[0].id
   build_pipeline_stage_type          = "BUILD"
   display_name                       = "Build and verify native x86 controller"
+  description                        = "Verify packaged source and build a native linux/amd64 Function image"
   image                              = "OL8_X86_64_STANDARD_10"
   primary_build_source               = "controller"
   build_spec_file                    = "build_spec.yaml"
   stage_execution_timeout_in_seconds = 1800
   build_runner_shape_config { build_runner_type = "DEFAULT" }
   build_pipeline_stage_predecessor_collection {
-    items { id = oci_devops_build_pipeline_stage.iam_propagation[0].id }
+    items { id = oci_devops_build_pipeline.function[0].id }
   }
   build_source_collection {
     items {
@@ -142,6 +149,7 @@ resource "oci_devops_build_pipeline_stage" "deliver" {
   build_pipeline_id         = oci_devops_build_pipeline.function[0].id
   build_pipeline_stage_type = "DELIVER_ARTIFACT"
   display_name              = "Deliver verified x86 image to private OCIR"
+  description               = "Deliver the verified image using the scoped build resource principal"
   build_pipeline_stage_predecessor_collection {
     items { id = oci_devops_build_pipeline_stage.build[0].id }
   }
@@ -167,11 +175,9 @@ resource "oci_devops_build_run" "function" {
   freeform_tags = local.tags
   lifecycle {
     replace_triggered_by = [terraform_data.function_image_build]
-    postcondition {
-      condition     = self.state == "SUCCEEDED"
-      error_message = "The x86 image build/delivery did not succeed. Review its DevOps log before retrying; no Function may use a failed build."
-    }
+    # The provider's create waiter requires SUCCEEDED. Avoid a redundant self
+    # postcondition: Terraform 1.5 can emit Invalid index after failed creation.
   }
   timeouts { create = "45m" }
-  depends_on = [oci_devops_build_pipeline_stage.deliver, oci_identity_policy.build, oci_logging_log.build]
+  depends_on = [oci_devops_build_pipeline_stage.deliver, terraform_data.build_iam_ready, oci_logging_log.build]
 }

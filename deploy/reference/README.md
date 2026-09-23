@@ -39,11 +39,11 @@ The default build uses the accompanying controller Dockerfile. Deploy and test t
 
 - Review the [integration overview](../../README.md), [client example](../../examples/README.md), and [operations runbook](../../docs/RUNBOOK.md) before deployment.
 - Provide the controller, network and registry compartments plus an existing VCN and Function subnet. The default standby deployment needs no pools, pool tags or pool compartment. When enabling enrollment, explicitly select an existing compartment containing the pools, their immutable instance configurations and workers. One controller targets one pool compartment and region. Use a dedicated staging worker compartment where practical.
-- For the default source build, provide an OCI username and auth token with permission to push images into the selected registry compartment. The stack creates the private OCIR repository and image during Apply; neither must exist before clicking Deploy. The build uses `linux/amd64` and deploys a `GENERIC_X86` Function. For the optional existing-image path, provide the image address and matching architecture; the digest is optional. Intel **worker** architecture is independent of the Function runtime architecture.
+- For the default source build, provide an OCI username and auth token with read/update access to the private OCI code repository created in the controller compartment. The deployer needs permission to create the DevOps resources and approved scoped build IAM; delivery uses that pipeline's resource principal, not the user token. The stack creates the private OCIR repository and image during Apply; neither must exist before clicking Deploy. The build uses `linux/amd64` and deploys a `GENERIC_X86` Function. For the optional existing-image path, provide the image address and matching architecture; the digest is optional. Intel **worker** architecture is independent of the Function runtime architecture.
 - The existing Function subnet must have DNS and outbound connectivity to the regional OCI APIs and Object Storage. Its routing, service/NAT gateways, security lists/NSGs and available IPs are the operator's responsibility. This module does not make an invocation endpoint private merely by using a private subnet.
 - Have the tenancy administrator review FaaS image/network access, controller resource-principal permissions, caller permissions, and OCI service limits. Cross-compartment images, volumes, VNICs, subnets, encryption keys or other custom launch dependencies may require additional **reviewed** permissions not inferred by this module.
 - The Resource Manager execution identity needs permission to create the defined resources, including the private OCIR repository in source-build mode. Standby performs no pool listing or reads. Enrollment additionally requires permission to list/read pools in the selected pool compartment and read their instance configurations so Plan can discover and verify them.
-- Protect Resource Manager stack variables, state and saved plans. `ocir_auth_token` is marked sensitive and used only for registry login, but Terraform 1.5 can retain sensitive inputs in state/plans. For local Terraform, configure an access-controlled, encrypted backend with locking and backups; this module does not prescribe one. Never commit tokens, populated `.tfvars`, state or plan files.
+- Protect Resource Manager stack variables, state and saved plans. `ocir_auth_token` is marked sensitive and used only for private OCI source publication, but Terraform 1.5 can retain sensitive inputs in state/plans. For local Terraform, configure an access-controlled, encrypted backend with locking and backups; this module does not prescribe one. Never commit tokens, populated `.tfvars`, state or plan files.
 
 ## 2. Deploy first, enroll pools later
 
@@ -198,11 +198,17 @@ the delivered digest. No local engine, prebuilt image, GitHub PAT or manually
 prepared pipeline is required. Resource Manager host architecture is irrelevant.
 
 `create_build_iam_resources` defaults to true, separately from runtime IAM. Its
-home-region dynamic group matches only this pipeline. Policies allow reading its
-source/artifact and REPOSITORY_READ/REPOSITORY_UPDATE on its OCIR repository.
+home-region dynamic group matches only this pipeline. Policies allow reading
+its exact source repository, DevOps artifact metadata in the controller
+compartment, OCIR repository metadata in the registry compartment, and
+REPOSITORY_READ/REPOSITORY_UPDATE on its one OCIR repository. Artifact metadata
+read and repository inspect are not restricted to a single object; the live
+delivery stage rejected the prior exact-artifact conditional read.
 UPDATE is not push-only and can permit image deletion. No Compute, Function
-deployment or secret permissions are granted to the build. The pipeline waits
-120 seconds for propagation; review failures rather than broadening IAM.
+deployment or secret permissions are granted to the build. Terraform waits
+180 seconds after creating/changing build IAM before submitting a build, because
+DevOps reads its specification before pipeline stages run. This is not a guarantee
+of IAM convergence; review authorization failures rather than broadening IAM.
 
 For a partial Apply that failed with `can't evaluate field OSType` or Podman's
 `--config` warning, update the same stack's Terraform configuration with the
@@ -212,7 +218,18 @@ corrected package. Preserve its state, variables and existing resources. Use
 Plan: the build step is replaced/retried, while existing infrastructure should
 be retained. Do not Apply unexplained bucket, repository, application or logging
 replacements. The GitHub deploy button creates a new stack, not a recovery of an
-existing stack. An error before registry login leaves the supplied token untested.
+existing stack. An error before source publication leaves the supplied token
+untested; registry delivery separately validates the pipeline's IAM.
+
+Upgrades from the early native-build candidate that included
+`oci_devops_build_pipeline_stage.iam_propagation` need a two-step graph migration:
+first point the BUILD stage's predecessor directly at the build pipeline and
+set its nonempty description; then remove the unused WAIT stage. Do not delete
+the pipeline or its artifacts to recover this. OCI refuses to delete a stage
+while another stage references it, and Terraform can attempt that deletion
+before rewiring its successor. Review the exact stage IDs and preserve state;
+re-plan after any approved Console/API predecessor correction. New stacks have
+no legacy WAIT stage and do not need this migration.
 
 The build runs again when the included Function source or build helper changes.
 An unchanged configuration reuses the existing built image. Failed build retries
@@ -267,7 +284,7 @@ image; it selects `GENERIC_X86`.
 
 ## 4. Review configuration and IAM
 
-In Resource Manager, configure the stack form. For local Terraform, copy `terraform.tfvars.example` to local `terraform.tfvars` and replace every placeholder; provide the registry token through a protected input, not a committed file. Keep `dry_run = true` and `enable_termination = false` initially. Choose operator-owned pool/profile and aggregate OCPU ceilings from staging budget and service-limit review; raising ceilings does not demonstrate that the controller can sustain that fleet size. Capacity guards remain enabled and include retiring capacity.
+In Resource Manager, configure the stack form. For local Terraform, copy `terraform.tfvars.example` to local `terraform.tfvars` and replace every placeholder; provide the source-publication token through a protected input, not a committed file. Keep `dry_run = true` and `enable_termination = false` initially. Choose operator-owned pool/profile and aggregate OCPU ceilings from staging budget and service-limit review; raising ceilings does not demonstrate that the controller can sustain that fleet size. Capacity guards remain enabled and include retiring capacity.
 
 The pool registry is currently inline Function configuration. [OCI limits combined Function/application configuration to 4 KB](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionspassingconfigparams-about.htm); this module conservatively rejects serialized configuration at approximately 4,000 bytes, including UTF-8 metadata. Raising `max_profiles` cannot override that service limit. Long pool identifiers/names reduce how many profiles fit. An external registry is not implemented. Separately reviewed, non-overlapping controller shards are an option, but each needs its own scope, ledger and budget allocation—there is no cross-controller aggregate guard. Do not add unreviewed application-level configuration outside Terraform.
 
@@ -338,7 +355,7 @@ include `&workingDirectory=deploy%2Freference`.
 
 Select the compartments, Function VCN and Function subnet from the form. The
 subnet selector is filtered by the selected network compartment and VCN. Provide
-the OCIR username/auth token for the default build, or use the optional existing
+the OCI source-publication username/auth token for the default build, or use the optional existing
 image inputs. Leave **Enroll existing pools now** unchecked to deploy in standby;
 the pool compartment and discovery settings are not needed yet. Set `scope_id`
 before the first Apply only if you have a chosen future group; otherwise use the
@@ -350,7 +367,7 @@ optional name blank unless you need a reviewed fixed name. The Resource Manager
 execution identity needs permission to create the defined resources and read
 the selected subnets; pool/configuration read permissions are needed only during
 enrollment. Runtime Function IAM is
-a separate requirement. Enter a registry token only in the sensitive
+a separate requirement. Enter the source-publication token only in the sensitive
 `ocir_auth_token` input; restrict access to stack variables, state and plans.
 
 Deselect **Run apply**, create the stack, run a **Plan**, and review it before

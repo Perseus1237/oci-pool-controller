@@ -15,12 +15,12 @@ locals {
     data.oci_objectstorage_namespace.current.namespace,
     oci_artifacts_container_repository.function[0].display_name
   ]) : ""
-  delivered_image = var.build_function_image ? one([
+  delivered_image = var.build_function_image ? try(one([
     for artifact in oci_devops_build_run.function[0].build_outputs[0].delivered_artifacts[0].items : artifact
     if artifact.output_artifact_name == "controller-image"
-  ]) : null
-  effective_function_image = var.build_function_image ? local.delivered_image.image_uri : trimspace(var.function_image)
-  effective_image_digest   = var.build_function_image ? local.delivered_image.delivered_artifact_hash : (var.function_image_digest == "" ? null : var.function_image_digest)
+  ]), null) : null
+  effective_function_image = var.build_function_image ? try(local.delivered_image.image_uri, "") : trimspace(var.function_image)
+  effective_image_digest   = var.build_function_image ? try(local.delivered_image.delivered_artifact_hash, null) : (var.function_image_digest == "" ? null : var.function_image_digest)
   effective_function_shape = var.build_function_image ? "GENERIC_X86" : var.function_shape
 }
 
