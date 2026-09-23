@@ -13,6 +13,9 @@ output "build_review" {
     project_id        = oci_devops_project.function[0].id
     pipeline_id       = oci_devops_build_pipeline.function[0].id
     run_id            = oci_devops_build_run.function[0].id
+    image_id          = try(local.built_registry_image.id, null)
+    image_tag         = local.built_image_tag
+    image_digest      = local.effective_image_digest
     source_repository = oci_devops_repository.function[0].id
     source_checksums  = local.function_source_checksums
     builder_image     = oci_devops_build_pipeline_stage.build[0].image

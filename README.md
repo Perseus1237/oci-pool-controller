@@ -184,7 +184,9 @@ That initial choice is then preserved for subsequent deployments.
 
 **Staging candidate:** a fresh Console test exposed an ARM64 Resource Manager
 host. Automatic builds now use an explicitly selected native x86 OCI DevOps
-runner instead. End-to-end qualification remains in progress; see the
+runner instead. Recovered-stack build, push, x86 Function deployment and signed
+standby invocation have passed; a clean GitHub-button deployment remains to be
+qualified. See the
 [deployment test record](docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md).
 
 Keep `build_function_image = true` (the default) to build from source.
@@ -220,9 +222,12 @@ Packaged source/build changes trigger a new build, with a unique tag per run.
 Base images/dependencies are not fully digest locked; use the existing-image
 option for a previously reviewed artifact.
 
-`create_build_iam_resources = true` creates home-region IAM scoped to this one
-pipeline, its source/artifact and its OCIR repository. Registry UPDATE can also
-permit image deletion; this is not a push-only grant. The build gets no worker,
+`create_build_iam_resources = true` creates home-region IAM for only this
+pipeline: exact source-repository read, artifact/repository metadata access in
+the selected compartments, and management of its one exact-named OCIR
+repository. Management includes image/repository deletion and metadata changes;
+this is not a push-only grant. The build code does not delete the repository or
+change its privacy. The build gets no worker,
 Function-deployment or secret-read permissions. Build logs and a Notifications
 topic are created, but no subscriptions or automatic triggers. Build IAM is
 independent of optional controller runtime IAM. Review all additions in Plan.

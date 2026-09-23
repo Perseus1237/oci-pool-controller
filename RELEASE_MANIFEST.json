@@ -11,19 +11,19 @@
       "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
     },
     {
-      "bytes": 16648,
+      "bytes": 16826,
       "path": "deploy/reference/main.tf",
-      "sha256": "6af6cd5079581d5d9de02eadc8c8b914ca5365ce11f3546205501d506489ad7a"
+      "sha256": "c7035a782b8b3370749be4b91a87f4628cfd060c084f05206ee474d3007305b9"
     },
     {
-      "bytes": 2805,
+      "bytes": 2969,
       "path": "deploy/reference/outputs.tf",
-      "sha256": "f86bb790d6b0fd4f14d11f943cdaa1eea4acdc08efefe2a0cd1161fde34735d7"
+      "sha256": "920f77dd251282e7d5c526d15914b368dd112172db4c2ba842c031374aaaa747"
     },
     {
-      "bytes": 36261,
+      "bytes": 36474,
       "path": "deploy/reference/README.md",
-      "sha256": "33163df11e09bc1cef9c47fdc47b607892ebf5770035a8048ba3db1ac50a90f8"
+      "sha256": "52b0da45f49e9e3d8bc5cc87846851861229abf99833b9a1b294d68739e22c58"
     },
     {
       "path": "deploy/reference/schema.yaml",
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 24195,
+      "bytes": 24493,
       "path": "README.md",
-      "sha256": "3af24c935029ec45e97c17de8e8ecec00c7ecce3a6dd2a8896e065274983d44f"
+      "sha256": "8b510e2c5ba24b9fb7a547fc1b6da9348d43c4f54e2226be268d10dd9d0927f3"
     },
     {
       "bytes": 2889,
@@ -122,8 +122,8 @@
     },
     {
       "path": "deploy/reference/image.tf",
-      "bytes": 3682,
-      "sha256": "b7df352187757da080b6bd291e9aacdc1b87c467c77a687e980bcc3e6caa6cf7"
+      "bytes": 5149,
+      "sha256": "445fa11c956b7ca7e73254b2d79d35ecc97c83f9376bae8c8cd21f98fe7e584e"
     },
     {
       "path": "deploy/reference/build_function_image.py",
@@ -137,8 +137,8 @@
     },
     {
       "path": "tests/test_resource_manager_deployment.py",
-      "bytes": 20176,
-      "sha256": "41f706774fb2d68845cdcbbf819164ff4686faf27a11e1f4b7069e9c729950be"
+      "bytes": 20997,
+      "sha256": "c54ddeb455dde428128fa2cf0ce7a45867b93648fd95642ee274dc368fb82d0e"
     },
     {
       "path": "deploy/reference/enrollment.tf",
@@ -192,8 +192,8 @@
     },
     {
       "path": "docs/GETTING-STARTED.md",
-      "bytes": 24722,
-      "sha256": "36c04049919d85e48f63e4edb075e811e33b5deead152f2ad3b739af575b97a4"
+      "bytes": 24942,
+      "sha256": "92553def9aff8edc05402fcdc7fe7857a970f1dc7e956eac210dba00bef129e4"
     },
     {
       "path": "deploy/reference/build.tf",
@@ -222,8 +222,8 @@
     },
     {
       "path": "docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md",
-      "bytes": 7696,
-      "sha256": "b988ab812aba5106c95093e4aaf09add983604e5354afdb47ba31cdd579cc16f"
+      "bytes": 9750,
+      "sha256": "7a65fc4b57f0e135189ea2d95d081e414b1d27212aa41e87f82cd7903f8f53ce"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",

@@ -2,7 +2,7 @@
 
 Prepared September 18, 2026. Reviewed source: `52528e6ffee7fc08511c1116db0ad4bacadade43` in [Perseus1237/oci-pool-controller](https://github.com/Perseus1237/oci-pool-controller/tree/52528e6ffee7fc08511c1116db0ad4bacadade43).
 
-**Status: preparation guide for a staging reference implementation, not a successfully completed fresh one-click deployment or production certification.** The current stack has deployment defects listed below. Instructions do not replace those code fixes. The repository describes this as unsupported sample code.
+**Status: preparation guide for a staging reference implementation, not production certification.** The September 23 deployment correction passed recovered-stack x86 build/push, Function creation and signed standby invocation. Clean one-click qualification is still pending; see the [deployment test record](RESOURCE-MANAGER-BUILD-TEST-20260922.md). The repository describes this as unsupported sample code.
 
 ## 1. Understand what you are deploying
 
@@ -185,7 +185,7 @@ For manual upload, upload the **generated Resource Manager ZIP**, not a develope
 4. Apply only the approved plan.
 5. Record `function_ocid`, `invoke_endpoint`, `function_image_digest`, `controller_scope_id`, `iam_review` and ledger outputs.
 6. Complete central runtime/caller IAM if using that path. Verify the Function is ACTIVE and the deployed digest is the intended artifact.
-7. Invoke with the approved signed client. An unenrolled controller intentionally reports `awaiting_pool_enrollment`; this proves neither Compute access nor readiness to scale.
+7. Invoke the read-only `scale_test_status` action with the approved signed client. An unenrolled controller intentionally reports `awaiting_pool_enrollment`; this proves neither Compute access nor readiness to scale. The legacy `status` action is intentionally rejected by controller-only deployments.
 
 **Checkpoint:** separately record deployment success, signed invocation success and remaining enrollment work. A successful Terraform Plan alone is not any of those runtime results.
 

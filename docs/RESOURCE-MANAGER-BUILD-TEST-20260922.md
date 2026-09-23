@@ -2,9 +2,9 @@
 
 ## Outcome
 
-**Native x86 image build passed; delivery is blocked by OCIR upload authorization.** The original Resource
-Manager-local build was blocked before image build/push and Function deployment.
-This is not yet a successful one-click qualification. No ARM Function was deployed: the requested
+**Recovered deployment passed: native x86 build, private OCIR delivery, Function creation and signed standby invocation.**
+The original Resource Manager-local build was blocked before image build/push and Function deployment.
+This is not yet a clean one-click qualification. No ARM Function was deployed: the requested
 Function architecture remained `GENERIC_X86`, and the target image `linux/amd64`.
 
 ## Scope and observed results
@@ -100,16 +100,44 @@ to the build runner. Runtime IAM remains disabled and no pools are enrolled.
   candidate tests the standard registry-management role constrained to that
   one repository, instead of filtering individual READ/UPDATE permissions.
   This includes repository lifecycle permissions; it is not tenancy-admin or
-  access to other repositories. Its live result is still pending.
+  access to other repositories. That run completed SUCCEEDED at 08:02:31 UTC;
+  its image was present in the still-private repository. The specific missing
+  permission within the former READ/UPDATE filters has not been isolated.
+- Successful DevOps OCIR delivery returned blank `image_uri` and
+  `delivered_artifact_hash` fields. Terraform's digest precondition correctly
+  prevented Function creation instead of accepting an unpinned image. The
+  correction queries OCIR using the exact repository OCID and unique build-run
+  tag after successful delivery, accepts exactly one available matching image,
+  and pins its registry SHA-256 digest. It never selects `latest`. Recovery can
+  reuse the successful build; another build is not required for this lookup fix.
+- The provider also dropped the delivered artifact's name/ID, although OCI's API
+  returned them. The final guard uses SUCCEEDED, the matching exported build-run
+  tag, an OCIR delivery marker, and the exact registry image/digest. The first
+  registry-lookup recovery verified the digest but was safely stopped by the
+  now-corrected name/ID check; no unverified image was deployed.
+
+## Recovered-stack acceptance — September 23, 2026
+
+- Reviewed recovery Apply succeeded without rebuilding the delivered image.
+- Function is ACTIVE in a `GENERIC_X86` application. Its digest matches the
+  exact OCIR image selected by the successful build-run tag:
+  `sha256:0be23b224880de11bc424fdf83b62cc1ec6d23681f7bd5f1a918d7ca87fd6a07`.
+- Packaged Function source checksums match the successful build's recorded inputs.
+- Signed `scale_test_status` invocation returned transport HTTP 200 and business
+  `status_code: 200`, with `result: awaiting_pool_enrollment`, zero enrolled
+  pools and `dryRun: true` at 08:24:28 UTC. Termination remains disabled.
+- An initial helper request used the legacy `status` action and correctly
+  received business 403 `action_not_allowed_for_role`. The helper was corrected;
+  no Function role restriction was removed. Its cold-start invocation took about
+  63 seconds in service logs; this is not a general latency benchmark.
+- All 160 offline tests pass, along with Terraform validation and packaging.
+- No workers were launched. Pool operations, ledger access from the Function,
+  production readiness and a clean-stack deployment are not established by this
+  standby smoke test.
 
 ## Remaining qualification
 
-Complete the native x86 OCI DevOps managed build. Build/push the controller image,
-verify `linux/amd64`, then deploy the Function using that exact artifact and
-record the resolved digest. This avoids relying on the architecture of Resource
-Manager's execution host.
-
-After integration, repeat a **new** GitHub-button deployment from empty stack
+Repeat a **new** GitHub-button deployment from empty stack
 state, then verify successful build, push, x86 Function creation and signed
 standby invocation. A recovered stack or offline engine mocks alone cannot
 establish that clean-deployment result. Standby invocation also does not qualify

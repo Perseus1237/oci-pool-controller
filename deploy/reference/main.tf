@@ -211,9 +211,10 @@ resource "oci_functions_function" "controller" {
   lifecycle {
     precondition {
       condition = !var.build_function_image || try(
+        local.delivery_confirmed &&
         startswith(local.effective_function_image, "${local.image_repository_url}:build-") &&
       can(regex("^sha256:[0-9a-f]{64}$", local.effective_image_digest)), false)
-      error_message = "The successful build must deliver a uniquely tagged image and SHA-256 digest to this stack's exact private OCIR repository."
+      error_message = "A successful build and exactly one available image with its unique build-run tag and SHA-256 digest are required in this stack's exact private OCIR repository. If registry metadata is not yet visible, rerun Plan/Apply; never substitute latest or an unrelated image."
     }
     precondition {
       # A conservative UTF-8 serialized-JSON bound under OCI's 4-KB combined

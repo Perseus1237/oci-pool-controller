@@ -18,13 +18,37 @@ locals {
     data.oci_objectstorage_namespace.current.namespace,
     oci_artifacts_container_repository.function[0].display_name
   ]) : ""
-  delivered_image = var.build_function_image ? try(one([
-    for artifact in oci_devops_build_run.function[0].build_outputs[0].delivered_artifacts[0].items : artifact
-    if artifact.output_artifact_name == "controller-image"
+  # build_spec.yaml derives the unique tag from this exact run OCID. DevOps can
+  # report successful OCIR delivery with blank image_uri/hash output fields.
+  built_image_tag = var.build_function_image ? "build-${regex("[^.]+$", oci_devops_build_run.function[0].id)}" : ""
+  delivery_confirmed = var.build_function_image ? try(
+    oci_devops_build_run.function[0].state == "SUCCEEDED" && length([
+      for variable in oci_devops_build_run.function[0].build_outputs[0].exported_variables[0].items : variable
+      if variable.name == "CONTROLLER_IMAGE_TAG" && variable.value == local.built_image_tag
+      ]) == 1 && length([
+      for artifact in oci_devops_build_run.function[0].build_outputs[0].delivered_artifacts[0].items : artifact
+      # Provider 8.29 also drops the delivered artifact's name and ID.
+      if artifact.artifact_type == "OCIR"
+    ]) == 1, false
+  ) : true
+  built_registry_image = var.build_function_image ? try(one([
+    for image in data.oci_artifacts_container_images.built[0].container_image_collection[0].items : image
+    if image.repository_id == oci_artifacts_container_repository.function[0].id &&
+    image.compartment_id == var.registry_compartment_ocid && image.state == "AVAILABLE" &&
+    contains(concat([image.version], try([for version in image.versions : version.version], [])), local.built_image_tag)
   ]), null) : null
-  effective_function_image = var.build_function_image ? try(local.delivered_image.image_uri, "") : trimspace(var.function_image)
-  effective_image_digest   = var.build_function_image ? try(local.delivered_image.delivered_artifact_hash, null) : (var.function_image_digest == "" ? null : var.function_image_digest)
+  effective_function_image = var.build_function_image ? "${local.image_repository_url}:${local.built_image_tag}" : trimspace(var.function_image)
+  effective_image_digest   = var.build_function_image ? try(local.built_registry_image.digest, null) : (var.function_image_digest == "" ? null : var.function_image_digest)
   effective_function_shape = var.build_function_image ? "GENERIC_X86" : var.function_shape
+}
+
+data "oci_artifacts_container_images" "built" {
+  count          = var.build_function_image ? 1 : 0
+  compartment_id = var.registry_compartment_ocid
+  repository_id  = oci_artifacts_container_repository.function[0].id
+  version        = local.built_image_tag
+  state          = "AVAILABLE"
+  depends_on     = [oci_devops_build_run.function]
 }
 
 resource "oci_artifacts_container_repository" "function" {

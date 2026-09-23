@@ -194,7 +194,10 @@ helper, never in Git or the build runner.
 The build selects `OL8_X86_64_STANDARD_10`, verifies packaged source checksums and
 native/output `linux/amd64`, then delivers through resource-principal IAM.
 Terraform waits for successful delivery and pins the `GENERIC_X86` Function to
-the delivered digest. No local engine, prebuilt image, GitHub PAT or manually
+the digest looked up in OCIR by the exact repository and unique build-run tag.
+DevOps can return blank image URI/digest fields even after successful delivery;
+the stack does not depend on those fields or substitute an unrelated image.
+No local engine, prebuilt image, GitHub PAT or manually
 prepared pipeline is required. Resource Manager host architecture is irrelevant.
 
 `create_build_iam_resources` defaults to true, separately from runtime IAM. Its
