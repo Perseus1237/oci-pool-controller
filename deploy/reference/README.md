@@ -201,10 +201,12 @@ prepared pipeline is required. Resource Manager host architecture is irrelevant.
 home-region dynamic group matches only this pipeline. Policies allow reading
 its exact source repository, DevOps artifact metadata in the controller
 compartment, OCIR repository metadata in the registry compartment, and
-REPOSITORY_READ/REPOSITORY_UPDATE on its one OCIR repository. Artifact metadata
+management of its one exact-named OCIR repository. Artifact metadata
 read and repository inspect are not restricted to a single object; the live
 delivery stage rejected the prior exact-artifact conditional read.
-UPDATE is not push-only and can permit image deletion. No Compute, Function
+Repository management includes image/repository deletion and metadata changes;
+this is not a push-only role. The build code does not delete repositories or
+change their privacy. No Compute, Function
 deployment or secret permissions are granted to the build. Terraform waits
 180 seconds after creating/changing build IAM before submitting a build, because
 DevOps reads its specification before pipeline stages run. This is not a guarantee

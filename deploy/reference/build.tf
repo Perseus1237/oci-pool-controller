@@ -86,10 +86,9 @@ locals {
     # Metadata access is compartment-scoped; artifact mutation is not granted.
     "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to read devops-deploy-artifact in compartment id ${var.controller_compartment_ocid}",
     "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to inspect repos in compartment id ${var.registry_compartment_ocid}",
-    # Keep each allowed permission in a separate flat condition. These are
-    # equivalent exact-repository grants, not repository-wide manage access.
-    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to manage repos in compartment id ${var.registry_compartment_ocid} where all {target.repo.name = '${oci_artifacts_container_repository.function[0].display_name}', request.permission = 'REPOSITORY_READ'}",
-    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to manage repos in compartment id ${var.registry_compartment_ocid} where all {target.repo.name = '${oci_artifacts_container_repository.function[0].display_name}', request.permission = 'REPOSITORY_UPDATE'}",
+    # Standard OCIR management role, constrained to this stack's exact repository.
+    # Includes repository lifecycle permissions; never grant it across the tenancy.
+    "Allow dynamic-group ${var.name_prefix}-build-${local.suffix} to manage repos in compartment id ${var.registry_compartment_ocid} where target.repo.name = '${oci_artifacts_container_repository.function[0].display_name}'",
   ] : []
 }
 
@@ -98,7 +97,7 @@ resource "oci_identity_policy" "build" {
   count          = var.build_function_image && var.create_build_iam_resources ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = "${var.name_prefix}-build-${local.suffix}"
-  description    = "Build reads its source/artifact and pushes to its private repository; no Compute, Functions or secrets access"
+  description    = "Build reads source/artifact metadata and manages only its private repository; no Compute, Functions or secrets access"
   statements     = local.build_policy_statements
   depends_on     = [oci_identity_dynamic_group.build]
 }

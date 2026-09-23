@@ -137,6 +137,9 @@ outputs:
 
     def test_source_build_keeps_unique_attempt_tags_and_function_dependency(self):
         source = (ROOT / "deploy/reference/image.tf").read_text(encoding="utf-8")
+        self.assertIn('data.oci_identity_regions.available.regions', source)
+        self.assertIn('if region.name == var.region', source)
+        self.assertIn('"${local.registry_region_key}.ocir.io"', source)
         self.assertIn('"build-${self.id}"', source)
         self.assertIn('local.delivered_image.image_uri', source)
         self.assertIn('local.delivered_image.delivered_artifact_hash', source)
@@ -164,9 +167,8 @@ outputs:
         self.assertIn('to read devops-deploy-artifact in compartment id ${var.controller_compartment_ocid}"', build)
         self.assertIn('to inspect repos in compartment id ${var.registry_compartment_ocid}"', build)
         self.assertIn('target.repo.name', build)
-        self.assertNotIn(', any {request.permission', build)
-        self.assertIn(", request.permission = 'REPOSITORY_READ'}", build)
-        self.assertIn(", request.permission = 'REPOSITORY_UPDATE'}", build)
+        self.assertNotIn('request.permission', build)
+        self.assertIn("to manage repos in compartment id ${var.registry_compartment_ocid} where target.repo.name = '${oci_artifacts_container_repository.function[0].display_name}'", build)
         self.assertNotIn('to manage devops-family', build)
         for forbidden in ('manage all-resources', 'manage instances', 'secret-family', 'REPOSITORY_CREATE', 'ocir_auth_token'):
             self.assertNotIn(forbidden, build)

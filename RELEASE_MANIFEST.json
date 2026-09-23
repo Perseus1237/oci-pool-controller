@@ -21,14 +21,14 @@
       "sha256": "f86bb790d6b0fd4f14d11f943cdaa1eea4acdc08efefe2a0cd1161fde34735d7"
     },
     {
-      "bytes": 36149,
+      "bytes": 36261,
       "path": "deploy/reference/README.md",
-      "sha256": "33669270268d4239bee1feec69f3afe6a7caa18b6e1fb451998cc810ffc45347"
+      "sha256": "33163df11e09bc1cef9c47fdc47b607892ebf5770035a8048ba3db1ac50a90f8"
     },
     {
       "path": "deploy/reference/schema.yaml",
-      "bytes": 11664,
-      "sha256": "8ec2dd47c0fd7d6b07f6e683aa1252606c89fb51499f48db33a7b8e0d3eae782"
+      "bytes": 11690,
+      "sha256": "c1cc429769077fb889d377f0f50503ea7e8a627d22d46964e894e51a6d5144b6"
     },
     {
       "bytes": 4203,
@@ -122,8 +122,8 @@
     },
     {
       "path": "deploy/reference/image.tf",
-      "bytes": 3473,
-      "sha256": "4ad5d4b53d96c1e47c1517274c192625d73a64a2f9db1a2e9e0433d057477d51"
+      "bytes": 3682,
+      "sha256": "b7df352187757da080b6bd291e9aacdc1b87c467c77a687e980bcc3e6caa6cf7"
     },
     {
       "path": "deploy/reference/build_function_image.py",
@@ -137,8 +137,8 @@
     },
     {
       "path": "tests/test_resource_manager_deployment.py",
-      "bytes": 19933,
-      "sha256": "6eb7aefb09b34ec3d456c1e6aaa6f0100ace6eeb07aee4668944c8b55a02263a"
+      "bytes": 20176,
+      "sha256": "41f706774fb2d68845cdcbbf819164ff4686faf27a11e1f4b7069e9c729950be"
     },
     {
       "path": "deploy/reference/enrollment.tf",
@@ -197,8 +197,8 @@
     },
     {
       "path": "deploy/reference/build.tf",
-      "bytes": 8348,
-      "sha256": "af21852f621bc78fc82792b1c9a127ffbf94604ca6b528da116e8e25b4f17098"
+      "bytes": 8052,
+      "sha256": "da0f1ad6791386ef92f8346a7992e53971f2866898cdd738a401f9f5004ca078"
     },
     {
       "path": "deploy/reference/build_spec.yaml",
@@ -222,8 +222,8 @@
     },
     {
       "path": "docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md",
-      "bytes": 6363,
-      "sha256": "9b9f6d71d9a2fa5fc74642177c3c3d10c215c7730c17d28a8de2a030b0febf88"
+      "bytes": 7696,
+      "sha256": "b988ab812aba5106c95093e4aaf09add983604e5354afdb47ba31cdd579cc16f"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",

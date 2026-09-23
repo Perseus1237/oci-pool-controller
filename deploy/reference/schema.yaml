@@ -88,7 +88,7 @@ variables:
     default: true
     visible: ${build_function_image}
     title: Create scoped build IAM in the tenancy home region
-    description: Grants only this pipeline read access to its source, artifact metadata read and repository metadata inspect in the selected compartments, and READ/UPDATE access to its one OCIR repository. No Compute or Function deployment access. Disable only if central IAM provides equivalent permissions.
+    description: Grants only this pipeline read access to its source, artifact metadata read and repository metadata inspect in the selected compartments, and management of its one OCIR repository (including lifecycle permissions). No Compute or Function deployment access. Disable only if central IAM provides equivalent permissions.
   ocir_username:
     type: string
     required: true

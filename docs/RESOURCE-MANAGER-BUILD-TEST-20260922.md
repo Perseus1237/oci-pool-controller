@@ -67,22 +67,40 @@ to the build runner. Runtime IAM remains disabled and no pools are enrolled.
   postcondition was removed because Terraform 1.5 still emitted `Invalid index`
   after failed resource creation; the OCI provider already waits for SUCCEEDED.
   Explicit stage descriptions address a separate `Invalid description` update
-  failure observed on the existing WAIT stage. These final changes need live retest.
+  failure observed on the existing WAIT stage. Subsequent retries passed these
+  migration/error-reporting checks, but still failed at registry delivery.
 - The metadata-update Apply changed IAM, then stopped with `409 Conflict` because
   Terraform attempted to delete the legacy WAIT stage before rewiring BUILD. The
   exact planned BUILD predecessor/description correction was applied through the
-  API. A new Plan is required before continuing. This migration issue does not
-  exist in a new stack, which has no legacy WAIT stage.
+  API. A new Plan was reviewed before continuing; the following Apply removed
+  the obsolete WAIT stage successfully. This migration issue does not exist in
+  a new stack, which has no legacy WAIT stage.
 - The subsequent retry successfully read the artifact and attempted OCIR upload,
   confirming progress past the previous artifact-read failure. Native image build
   again succeeded (approximately 168 seconds). OCIR denied initiation of layer
   upload for the pipeline resource principal; the repository remained empty.
   Its name, compartment, namespace and privacy were verified against the policy.
-  The current candidate splits the same exact-repository READ/UPDATE grant into
+  The next candidate split the same exact-repository READ/UPDATE grant into
   two flat conditions, without adding permissions or broadening repository scope.
-  That retry is pending; the underlying cause is not yet conclusively isolated.
+  That retry also failed at the same OCIR layer-upload authorization check.
+  Its native image build and output verification succeeded a third time
+  (approximately 168 seconds); the build run ended FAILED at 07:24:38 UTC on
+  September 23. No artifact digest was delivered and no Function was deployed
+  or invoked. Splitting the conditions was not a successful fix. The underlying
+  authorization cause is not yet conclusively isolated; further blind retries
+  or broader registry write grants are not justified by this evidence.
 - All 160 offline tests and Terraform validation pass. These do not establish
   live success or a clean-deployment result.
+- An isolated retry changed only the artifact endpoint to the documented
+  region-key form (`iad.ocir.io`), addressing the same private repository.
+  Native build passed; upload failed with the same authorization denial at
+  07:43:23 UTC. The endpoint change did not resolve the failure. A bounded Audit
+  lookup confirmed artifact read succeeded, but did not expose the registry
+  authorization decision. With explicit administrator approval, the next
+  candidate tests the standard registry-management role constrained to that
+  one repository, instead of filtering individual READ/UPDATE permissions.
+  This includes repository lifecycle permissions; it is not tenancy-admin or
+  access to other repositories. Its live result is still pending.
 
 ## Remaining qualification
 

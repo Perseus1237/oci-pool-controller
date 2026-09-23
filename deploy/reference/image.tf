@@ -8,8 +8,11 @@ locals {
     [for name in sort(keys(local.function_source_checksums)) : local.function_source_checksums[name]],
     [for name in ["publish_build_source.py", "native_build.py", "build_spec.yaml"] : filesha256("${path.module}/${name}")]
   )))
-  # OCI commercial-region registry endpoint; Functions and OCIR share a region.
-  registry_endpoint = "ocir.${var.region}.oci.oraclecloud.com"
+  # Use the region-key endpoint documented for DevOps artifact delivery.
+  # It addresses the same regional OCIR repository; no registry is recreated.
+  registry_region_key = lower(one([for region in data.oci_identity_regions.available.regions : region.key
+  if region.name == var.region]))
+  registry_endpoint = "${local.registry_region_key}.ocir.io"
   image_repository_url = var.build_function_image ? join("/", [
     local.registry_endpoint,
     data.oci_objectstorage_namespace.current.namespace,
