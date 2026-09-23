@@ -203,6 +203,35 @@ class ImageBuildTests(unittest.TestCase):
                 self.assertNotIn("push", self.steps())
                 self.assert_cleaned_up()
 
+    def test_supported_engine_info_variants(self):
+        cases = (
+            ("docker", {"OSType": "linux", "Architecture": "amd64"}),
+            ("podman", {"Host": {"OS": "linux", "Arch": "amd64"}}),
+            ("podman", {"host": {"os": "linux", "arch": "x86_64"}}),
+        )
+        for engine, info in cases:
+            with self.subTest(engine=engine, info=info):
+                self.engine = engine
+                self.calls.clear()
+                def variant(command, **kwargs):
+                    result = self.fake_docker(command, **kwargs)
+                    if self.step(command) == "info":
+                        result.stdout = json.dumps(info)
+                    return result
+                self.run_build(variant)
+                self.assertEqual(self.steps()[-1], "push")
+                self.assert_cleaned_up()
+
+    def test_non_linux_engine_cannot_build_or_authenticate(self):
+        def windows(command, **kwargs):
+            result = self.fake_docker(command, **kwargs)
+            result.stdout = json.dumps({"OSType": "windows", "Architecture": "amd64"})
+            return result
+        with self.assertRaisesRegex(builder.BuildError, "native linux/amd64"):
+            self.run_build(windows)
+        self.assertEqual(self.steps(), ["info"])
+        self.assert_cleaned_up()
+
     def test_malformed_or_unknown_engine_and_image_info_fail_closed(self):
         for step, response in (("info", "not json"), ("info", "[]"), ("info", "{}"),
                                ("info", '{"host": null}'), ("image", "not json"),

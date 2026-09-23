@@ -186,7 +186,24 @@ During Apply, the stack creates a private OCIR repository in
 The OCI Functions API resolves the image digest automatically. You do not enter
 an image address or digest, and you do not need a pre-existing repository,
 local Podman session, separate generated ZIP, or OCI DevOps pipeline.
-Resource Manager supplies the [Docker build host](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/terraformhost.htm).
+Resource Manager supplies the [build host](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/terraformhost.htm).
+The helper detects Docker or Podman from engine information, including a
+`docker` executable backed by Podman. It requires native Linux x86 and checks
+the built image reports `linux/amd64` before authenticating or pushing. Podman
+uses `--platform linux/amd64` and a private `--authfile` for build/login/push;
+Docker retains its Docker 19-compatible build path and private `--config`.
+Credentials are sent only to login over standard input, never to the build
+environment or command line. Temporary auth/config files are removed on exit.
+
+For a partial Apply that failed with `can't evaluate field OSType` or Podman's
+`--config` warning, update the same stack's Terraform configuration with the
+corrected package. Preserve its state, variables and existing resources. Use
+`deploy/reference` for a generated Resource Manager ZIP, or
+`oci-pool-controller-main/deploy/reference` for GitHub `main.zip`. Review a new
+Plan: the build step is replaced/retried, while existing infrastructure should
+be retained. Do not Apply unexplained bucket, repository, application or logging
+replacements. The GitHub deploy button creates a new stack, not a recovery of an
+existing stack. An error before registry login leaves the supplied token untested.
 
 The build runs again when the included Function source or build helper changes.
 An unchanged configuration reuses the existing built image. Failed build retries
@@ -336,7 +353,7 @@ stack.
 
 ### Local Terraform option
 
-From `deploy/reference`, after configuring the approved Terraform backend and OCI deployer credentials. Source-build mode also requires a working Docker daemon on this local host and the OCIR build credentials; the existing-image path does not require Docker:
+From `deploy/reference`, after configuring the approved Terraform backend and OCI deployer credentials. Source-build mode also requires a working native Linux x86 Docker or Podman engine and the OCIR build credentials; the existing-image path does not require a container engine:
 
 ```sh
 terraform init

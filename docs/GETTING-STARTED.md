@@ -97,7 +97,21 @@ Select **Build and deploy the Function automatically**. Prepare:
 
 Enter the token only into the sensitive stack field. It is not the Console password or the caller's API-signing credential. Restrict access to variables, state and saved plans because sensitive Terraform inputs can remain there.
 
-The stack is intended to create the private repository and build an x86 controller image. **This path still needs the build-engine/native-architecture fixes identified in our review. Do not describe it as verified one-click success yet.**
+The stack creates the private repository and builds an x86 controller image.
+The corrected helper detects Docker, native Podman and Podman-backed `docker`
+commands, uses engine-specific temporary credentials, and verifies `linux/amd64`
+before login/push. A native Linux x86 builder is required; an ARM host is rejected
+with instructions to use a native x86 runner or a reviewed prebuilt image.
+Automated builder tests do not establish end-to-end one-click success: retain
+the exact revision, successful build/push, deployed digest and signed invocation
+results from a real Resource Manager Apply before making that claim.
+
+If Apply already created the ledger, repository, application or logs and then
+failed during image build, **update that existing stack**, keeping its state and
+variables. Review a fresh Plan before applying; do not delete/recreate those
+resources or click the deploy button to recover them. A failure before login
+does not validate the OCIR token. See the
+[build and recovery instructions](../deploy/reference/README.md#default-build-during-resource-manager-apply).
 
 ### Path B: existing reviewed controller image
 
@@ -238,7 +252,7 @@ Add Gateway only for an agreed additional HTTP API requirement. It needs fronten
 | Issue in reviewed source | Required disposition |
 | --- | --- |
 | IAM writes use deployment-region provider | Implement/test home-region IAM provider, or document and test central IAM provisioning |
-| Image helper assumes native-x86 Docker host | Fix engine and architecture detection; provide a tested x86 build path or reviewed prebuilt alternative |
+| Docker/Podman build compatibility | Corrected helper has offline engine/auth/architecture regression coverage; qualify build/push/deploy/invoke on the actual Resource Manager host |
 | Manual-image default is ARM | Require explicit architecture matching and actionable mismatch checks |
 | Switching build modes removes a protected managed repository from configuration | Implement a reviewed retention/migration path; do not bypass `prevent_destroy` |
 | Optional names submitted as explicit empty strings fail validation | Normalize optional blanks and test real Console serialization |
@@ -248,4 +262,6 @@ The existing guide contains many of these prerequisites, but it is not an end-to
 
 Before calling this customer-ready, have someone unfamiliar with the project follow the released guide and package in a clean environment, with no undocumented administrator rescue. Retain evidence for both automatic-build and prebuilt-image paths, same/different home region, blank/default form inputs, deployment, first grow, protected scale-down and cleanup.
 
-Local evidence: [deployment review](DEPLOYMENT-REVIEW.md) and [controller/deployment regression results](../validation-52528e6/RESULTS.md). No repository changes, fresh cloud deployment or live scaling execution were performed while preparing this guide.
+Repository evidence: [builder regression tests](../tests/test_resource_manager_image_build.py)
+and [prior focused live controller results](SCALING_STATE_ACCEPTANCE_20260917.md).
+The prior controller tests are not evidence of a fresh one-click deployment.

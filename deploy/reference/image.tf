@@ -1,4 +1,5 @@
-# Resource Manager includes Docker. Building during Apply keeps the generic
+# Resource Manager may expose Docker or Podman (including a docker shim).
+# Building during Apply keeps the generic
 # GitHub Deploy button self-contained; no local image build or DevOps project.
 locals {
   function_source_dir = abspath("${path.module}/../../function")

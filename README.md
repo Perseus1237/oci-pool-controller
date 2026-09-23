@@ -197,12 +197,25 @@ under **Tokens and keys → Auth Tokens** if you do not already have one. The
 token's user needs permission to push images into the selected registry
 compartment. [Oracle auth-token instructions](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
 
-Docker is included on the [Resource Manager Terraform host](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/terraformhost.htm).
+The builder detects Docker or Podman on the
+[Resource Manager Terraform host](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/terraformhost.htm),
+including hosts where `docker` is a Podman wrapper. It requires a native x86
+Linux engine and verifies the built image is `linux/amd64` before registry login
+or push. Podman uses an explicit temporary auth file; Docker uses a temporary
+config directory. The token goes to login over standard input, not command-line
+arguments or the build environment, and temporary credentials are removed on exit.
 No local Docker/Podman installation, separate build pipeline, or generated ZIP is
 needed for this path. Apply rebuilds when the included Function source or build
 helper changes. Base-image tags and downloaded dependencies can change between
 builds; use the existing-image option below when deploying a previously built
 artifact is required.
+
+If an earlier Apply failed with `can't evaluate field OSType` or a Podman
+`--config` warning, update the **existing stack's** configuration with the
+corrected source, retain its state and variables, then review a new Plan before
+Apply. Do not recreate the ledger, repository, application or logs. Clicking the
+button again starts a new stack; it does not update a preserved partial stack.
+A build failure before login does not validate the OCIR auth token.
 
 The auth token is a sensitive stack input used for registry login. Terraform
 1.5 can retain sensitive inputs in state and saved plans; protect Resource

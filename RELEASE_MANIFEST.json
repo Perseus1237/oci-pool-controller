@@ -21,9 +21,9 @@
       "sha256": "6313a8ab2bd9e02e81493d7e12443ee7e408e33aed9df892877079b7a7b9a1fa"
     },
     {
-      "bytes": 32802,
+      "bytes": 34050,
       "path": "deploy/reference/README.md",
-      "sha256": "7f9b4277b184bf8508d6318f5740480e7f8c034778a8d0b4af9886dc47b6e79c"
+      "sha256": "caa50429c56fd9f917c6f9b23d8dbbfbec8ecedbf22933ad7815799569e705be"
     },
     {
       "path": "deploy/reference/schema.yaml",
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 22195,
+      "bytes": 23070,
       "path": "README.md",
-      "sha256": "62c79ebd43886597b9f180b24dddca7fe5e774c45ad54d248a5ce67c7649b090"
+      "sha256": "451451d5bd2a98380dcc4130ba06af9a5a3fffbb0386d28dd8e02ce92d1f0fd3"
     },
     {
       "bytes": 2889,
@@ -122,18 +122,18 @@
     },
     {
       "path": "deploy/reference/image.tf",
-      "bytes": 2945,
-      "sha256": "b7384799961388c207505778b744e40701bbf0b74f22a22edb1ba425f3ddd597"
+      "bytes": 2985,
+      "sha256": "d564c838dbd30482c5e03ebe6821b3c9d8a24fd495fc753fac843ac6937d48ed"
     },
     {
       "path": "deploy/reference/build_function_image.py",
-      "bytes": 6608,
-      "sha256": "6912b096d3f6997c586c4c2b15dc076f19835e6caa91cbcfec7b4ed1a1f93540"
+      "bytes": 9731,
+      "sha256": "62ba9a5bc1c039b9a8e55fef0a446ec9382deb1bda0635dbdad719e7280776cb"
     },
     {
       "path": "tests/test_resource_manager_image_build.py",
-      "bytes": 7919,
-      "sha256": "559d4df035b0f116667d7d7eeb7ba150788e900996bd575d56fd607f5a21f919"
+      "bytes": 16161,
+      "sha256": "867cb5c2fd4f5418d25d5516a2959ff3cb4d96e26c4515d7457f794cc0067ed6"
     },
     {
       "path": "tests/test_resource_manager_deployment.py",
@@ -189,6 +189,11 @@
       "path": "docs/SCALING_STATE_ACCEPTANCE_20260917.md",
       "bytes": 11002,
       "sha256": "d5961335c14d0b97e7250277f6c499a796f115b114c8a48b109553b6d969ca09"
+    },
+    {
+      "path": "docs/GETTING-STARTED.md",
+      "bytes": 23390,
+      "sha256": "5b8a57dd6ad321659344eb989cfad19984b683cb050366487ef0ed18a7a7db5d"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",
