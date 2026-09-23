@@ -303,7 +303,7 @@ record acceptance or blocking follow-up for each before fleet promotion:
   approved one-pool production canary before expansion, with one scaling writer.
 
 
-## 10. Test harness
+## Appendix 1. Test harness
 
 To functionally test the OCI Function, someone should test it in stages: **offline**, **signed read-only invocation**, **dry-run reconciliation**, then a **small disposable live pool canary**.
 
