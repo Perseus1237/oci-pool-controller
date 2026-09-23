@@ -301,3 +301,273 @@ record acceptance or blocking follow-up for each before fleet promotion:
   caller ticks are not a capacity-recovery mechanism.
 - Validate rollback with irreversible retirement and conduct a separately
   approved one-pool production canary before expansion, with one scaling writer.
+
+
+## 10. Test harness
+
+To functionally test the OCI Function, someone should test it in stages: **offline**, **signed read-only invocation**, **dry-run reconciliation**, then a **small disposable live pool canary**.
+
+## 1. Run the offline tests first
+
+From the repository root:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+Also validate the Terraform:
+
+```bash
+terraform -chdir=deploy/reference init -backend=false
+terraform -chdir=deploy/reference fmt -check
+terraform -chdir=deploy/reference validate
+```
+
+These checks do not contact OCI or mutate resources. They validate the local controller behavior and deployment configuration.
+
+## 2. Deploy a staging Function
+
+Use an isolated OCI staging compartment, VCN/subnet, ledger bucket, and preferably one disposable existing instance pool.
+
+Start with the safe settings:
+
+```hcl
+enroll_pools       = false
+dry_run            = true
+enable_termination = false
+enable_bounded_growth = false
+```
+
+The repository recommends deploying the Function first in standby, then enrolling pools later. After deployment, capture:
+
+```bash
+terraform output function_ocid
+terraform output invoke_endpoint
+terraform output controller_scope_id
+terraform output -json iam_review
+```
+
+The caller needs:
+
+- An OCI user or machine identity
+- Permission to invoke this exact Function
+- An OCI CLI/SDK configuration and signing key
+- The Function OCID
+- The Functions invoke endpoint
+- A persistent local outbox path
+
+This is a direct OCI Functions invocation; no API Gateway is involved.
+
+## 3. Perform signed read-only tests
+
+Install the example client:
+
+```bash
+python3 -m venv .venv-client
+.venv-client/bin/python -m pip install -r examples/requirements.txt
+```
+
+Check the Function’s pool view:
+
+```bash
+.venv-client/bin/python examples/pool_controller.py \
+  --function-id '<function-ocid>' \
+  --endpoint 'https://<functions-invoke-endpoint>' \
+  --profile POOL_STAGING \
+  --outbox /secure/state/controller-outbox.sqlite \
+  pools
+```
+
+Test a known request status:
+
+```bash
+.venv-client/bin/python examples/pool_controller.py \
+  --function-id '<function-ocid>' \
+  --endpoint 'https://<functions-invoke-endpoint>' \
+  --profile POOL_STAGING \
+  --outbox /secure/state/controller-outbox.sqlite \
+  status --request-id '<request-uuid>'
+```
+
+Verify that:
+
+- IAM-authorized invocation succeeds.
+- Unauthorized callers are rejected.
+- Wrong pool keys or wrong scope are rejected.
+- The application response envelope is decoded correctly.
+- HTTP success is not mistaken for business success.
+
+The Function returns an envelope such as:
+
+```json
+{
+  "status_code": 202,
+  "body": {
+    "request_id": "...",
+    "request_state": "submitted",
+    "retryable": true
+  }
+}
+```
+
+The important status is inside `body`; transport-level HTTP 200 alone does not mean the operation succeeded.
+
+## 4. Test demand reconciliation in dry-run mode
+
+Submit a small demand request against the enrolled staging pool:
+
+```bash
+.venv-client/bin/python examples/pool_controller.py \
+  --function-id '<function-ocid>' \
+  --endpoint 'https://<functions-invoke-endpoint>' \
+  --profile POOL_STAGING \
+  --outbox /secure/state/controller-outbox.sqlite \
+  demand \
+  --pool '<pool-key>' \
+  --target 1 \
+  --generation 1
+```
+
+Then replay it:
+
+```bash
+.venv-client/bin/python examples/pool_controller.py \
+  --function-id '<function-ocid>' \
+  --endpoint 'https://<functions-invoke-endpoint>' \
+  --profile POOL_STAGING \
+  --outbox /secure/state/controller-outbox.sqlite \
+  tick --pool '<pool-key>'
+```
+
+Repeat `tick` until the request reaches its expected terminal or retryable state.
+
+With `dry_run = true`, the test should verify validation, ledger writes, request generation handling, and response behavior **without changing OCI pool capacity**.
+
+Test request semantics such as:
+
+- Replaying the same UUID and payload.
+- Sending a newer generation.
+- Sending an old generation and confirming it is superseded.
+- Reusing a generation with a different target and confirming rejection.
+- Retrying after a transient response.
+- Confirming that the SQLite outbox preserves the request across client restarts.
+
+The client requires a persistent outbox; do not delete it between runs.
+
+## 5. Run a controlled live scale-out test
+
+After dry-run validation, apply a reviewed Terraform change:
+
+```hcl
+dry_run            = false
+enable_termination = false
+```
+
+Then submit a very small target, such as one worker:
+
+```bash
+.venv-client/bin/python examples/pool_controller.py \
+  --function-id '<function-ocid>' \
+  --endpoint 'https://<functions-invoke-endpoint>' \
+  --profile POOL_STAGING \
+  --outbox /secure/state/controller-outbox.sqlite \
+  demand \
+  --pool '<pool-key>' \
+  --target 1 \
+  --generation 2
+```
+
+Continue running:
+
+```bash
+... tick --pool '<pool-key>'
+```
+
+Check OCI pool membership and lifecycle state independently. Confirm:
+
+- The pool reaches the desired non-retiring capacity.
+- New instances have `InstanceTerminationProtectionEnabled="1"`.
+- The Function does not exceed configured pool or aggregate limits.
+- The new worker registers with the actual scheduler/runtime.
+- The worker is genuinely dispatchable; `RUNNING` alone is not sufficient.
+
+## 6. Test retirement only after drain validation
+
+Retirement is destructive and permanent. Before testing it:
+
+1. Stop assigning work to the selected worker.
+2. Confirm its jobs and results are complete.
+3. Confirm the worker is fully drained.
+4. Enable termination through a reviewed IAM and Terraform change:
+
+```hcl
+enable_termination = true
+```
+
+Then issue the exact-worker retirement request:
+
+```bash
+.venv-client/bin/python examples/pool_controller.py \
+  --function-id '<function-ocid>' \
+  --endpoint 'https://<functions-invoke-endpoint>' \
+  --profile POOL_STAGING \
+  --outbox /secure/state/controller-outbox.sqlite \
+  retire \
+  --pool '<pool-key>' \
+  --instance-id '<worker-ocid>' \
+  --confirmed-idle-and-dispatch-disabled
+```
+
+Replay it:
+
+```bash
+... tick --pool '<pool-key>'
+```
+
+Verify that:
+
+- Only the specified worker is selected.
+- The protection tag is changed to the exact value `"0"`.
+- The worker is detached and ultimately reaches `TERMINATED`.
+- A busy or protected worker is not terminated.
+- A committed retirement cannot be canceled by sending new demand.
+- Returned demand causes a different worker to be launched rather than reusing the retiring worker.
+
+The repository explicitly warns that a tag change or detach is not proof of termination; the exact worker must be observed in an authoritative terminal state.
+
+## 7. Exercise the acceptance scenarios
+
+The runbook lists the main functional scenarios to execute:
+
+- Read-only/authentication and dry-run behavior
+- Small scale-out
+- Overlapping demand while the pool is `SCALING`
+- Rapid demand changes such as `2 → 3 → 5 → 4`
+- Independent reconciliation of two pools
+- Busy-worker protection
+- Permanent retirement with returning demand
+- Completed-demand replay
+- Stale and superseded requests
+- Invalid protection/provenance/scope data
+- Timeouts, `409`, `412`, `429`, and `5xx` responses
+- Caller or Function restart
+- Capacity/service-limit failures
+- Exact cleanup of the disposable pool
+
+These should be run in order, with evidence recorded for each test. The project’s runbook says to pause dependent tests after a failure and preserve the Function logs, request IDs, OCI work-request IDs, pool membership, lifecycle states, and outbox records.
+
+## 8. Clean up safely
+
+For a disposable test pool:
+
+1. Stop job assignment.
+2. Drain all workers.
+3. Retire only explicitly approved worker OCIDs.
+4. Publish a new demand generation with target zero if the entire pool is disposable.
+5. Continue ticking until every intended worker is authoritatively `TERMINATED`.
+6. Verify no detached-but-still-terminating workers remain.
+7. Preserve the ledger and test evidence.
+
+Do **not** use `terraform destroy` to clean up workers. The Terraform stack does not own the existing worker pool, and deleting the ledger during active retirement can destroy the controller’s durable safety state.
+
+The project’s recommended test flow is summarized in [`docs/RUNBOOK.md`](https://github.com/Perseus1237/oci-pool-controller/blob/main/docs/RUNBOOK.md#L68-L127), while the command-line client is in [`examples/pool_controller.py`](https://github.com/Perseus1237/oci-pool-controller/blob/main/examples/pool_controller.py#L269-L319).
