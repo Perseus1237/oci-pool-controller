@@ -3,9 +3,11 @@ version: "20260916"
 title: OCI Pool Controller Reference Implementation
 description: Unsupported reference implementation for existing OCI instance pools.
 informationalText: >-
-  Apply creates a private OCIR repository, builds the included Function source,
-  and deploys it. No prebuilt image is required. Supply registry authentication
-  below. By default the Function deploys without pools and awaits enrollment.
+  Apply builds the included source on a native x86 OCI DevOps runner, delivers
+  it to a private OCIR repository and deploys an x86 Function. Supply OCI source
+  publication credentials below. Scoped build IAM is created by default;
+  controller runtime IAM is a separate option. No prebuilt image is required.
+  By default the Function deploys without pools and awaits enrollment.
   Existing Function networking is required. Enable Enroll existing pools now
   only when prepared pools exist; review the discovered IDs and limits in Plan.
   This stack never creates or retags workers. Start with dry-run enabled and
@@ -14,7 +16,7 @@ variableGroups:
   - title: Existing infrastructure
     variables: [region, tenancy_ocid, controller_compartment_ocid, network_compartment_ocid, function_vcn_ocid, registry_compartment_ocid, subnet_ids]
   - title: Function deployment
-    variables: [build_function_image, ocir_username, ocir_auth_token, function_image, function_image_digest, function_shape]
+    variables: [build_function_image, create_build_iam_resources, ocir_username, ocir_auth_token, function_image, function_image_digest, function_shape]
   - title: Pool enrollment
     variables: [enroll_pools, pool_compartment_ocid, scope_id, auto_discover_pools, default_pool_max_size]
   - title: Advanced manual enrollment
@@ -80,19 +82,25 @@ variables:
     type: boolean
     default: true
     title: Build and deploy the Function automatically
-    description: Creates a private OCIR repository and builds the included source for x86 during Apply. Disable only to supply an existing image.
+    description: Creates a native x86 DevOps build pipeline and private source/OCIR repositories, builds and delivers the image, then deploys the Function. Disable only for an existing image.
+  create_build_iam_resources:
+    type: boolean
+    default: true
+    visible: ${build_function_image}
+    title: Create scoped build IAM in the tenancy home region
+    description: Grants only this pipeline read access to its source/artifact and READ/UPDATE access to its OCIR repository. No Compute or Function deployment access. Disable only if central IAM provides equivalent permissions.
   ocir_username:
     type: string
     required: true
     visible: ${build_function_image}
-    title: OCI registry username
-    description: Include the identity domain where applicable (for example Default/user@example.com). Do not include the tenancy namespace; it is added automatically.
+    title: OCI source-publication username
+    description: Include the identity domain (for example Default/user@example.com). The tenancy name is added automatically. This user needs read/update access to the new OCI code repository.
   ocir_auth_token:
     type: password
     required: true
     visible: ${build_function_image}
-    title: OCI auth token
-    description: Auth token for the registry user, not the Console password. Create under your profile's Tokens and keys. Restrict access to stack variables and state.
+    title: OCI source-publication auth token
+    description: Publishes only the included build inputs to the private OCI code repository. Not stored in Git or sent to the build runner. Image delivery uses scoped IAM. Restrict access to stack variables and state.
   function_image:
     type: string
     required: true

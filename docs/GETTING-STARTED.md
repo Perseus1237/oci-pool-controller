@@ -89,19 +89,27 @@ Custom worker images, subnets, encrypted volumes or keys in other compartments c
 
 ### Path A: automatic build, intended one-click experience
 
+**Live qualification in progress:** Resource Manager assigned an ARM64 Podman
+host in the fresh test. The candidate now uses an explicit native x86 OCI DevOps
+runner; the Docker/Podman compatibility fix alone was insufficient.
+See the [test record](RESOURCE-MANAGER-BUILD-TEST-20260922.md).
+
 Select **Build and deploy the Function automatically**. Prepare:
 
-1. An OCI registry user with approved push access in the registry compartment.
-2. The domain/username, for example `Default/user@example.com`. The form adds the tenancy namespace; do not prefix it yourself.
+1. An OCI user with approved read/update access to the new private OCI DevOps code repository, plus deployer permissions to create build resources and approved build IAM.
+2. The domain/username, for example `Default/user@example.com`. The form adds the tenancy name; do not prefix it yourself.
 3. An OCI auth token. In the Console, open your profile, then **Tokens and keys → Auth Tokens → Generate token**. Save it securely immediately; existing token values cannot be displayed later. Do not delete an existing token without confirming its dependencies. [Oracle token instructions](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
 
 Enter the token only into the sensitive stack field. It is not the Console password or the caller's API-signing credential. Restrict access to variables, state and saved plans because sensitive Terraform inputs can remain there.
 
-The stack creates the private repository and builds an x86 controller image.
-The corrected helper detects Docker, native Podman and Podman-backed `docker`
-commands, uses engine-specific temporary credentials, and verifies `linux/amd64`
-before login/push. A native Linux x86 builder is required; an ARM host is rejected
-with instructions to use a native x86 runner or a reviewed prebuilt image.
+The stack creates the native x86 DevOps pipeline and private source/OCIR
+repositories. The auth token publishes only the packaged build inputs through
+a temporary, repository-scoped Git credential helper; it is never committed or
+passed to the build runner. Delivery uses the pipeline's scoped resource-principal
+IAM. The build verifies packaged checksums, native x86 and `linux/amd64` output,
+then Terraform waits for delivery and pins the Function to the delivered digest.
+`create_build_iam_resources=true` creates build-only IAM in the tenancy home
+region. This is separate from controller runtime IAM and grants no Compute access.
 Automated builder tests do not establish end-to-end one-click success: retain
 the exact revision, successful build/push, deployed digest and signed invocation
 results from a real Resource Manager Apply before making that claim.
@@ -145,6 +153,8 @@ Click the repository's **Deploy to Oracle Cloud** button. Confirm the downloaded
 | Controller / network / registry compartments | Values recorded in step 2 |
 | Existing Function VCN and subnets | Prepared resources from step 3 |
 | Build automatically | Path A, or uncheck for Path B |
+| Create scoped build IAM | On for Path A after review; independent of controller runtime IAM |
+| OCI source-publication username / auth token | Path A only; used for private OCI Git publication, never sent to the builder |
 | Existing image / digest / architecture | Path B only; explicitly use `GENERIC_X86` for x86 |
 | Enroll existing pools now | Unchecked for first deployment if pools are not prepared |
 | Controller group | Leave at generated default for a new group; use an existing planned scope only deliberately |
@@ -251,8 +261,9 @@ Add Gateway only for an agreed additional HTTP API requirement. It needs fronten
 
 | Issue in reviewed source | Required disposition |
 | --- | --- |
-| IAM writes use deployment-region provider | Implement/test home-region IAM provider, or document and test central IAM provisioning |
+| Home-region IAM | Candidate discovers the tenancy home region for IAM writes; qualify same/different deployment-region cases |
 | Docker/Podman build compatibility | Corrected helper has offline engine/auth/architecture regression coverage; qualify build/push/deploy/invoke on the actual Resource Manager host |
+| Resource Manager assigned an ARM64 build host | Candidate uses native x86 DevOps; complete live build/delivery/invocation and clean GitHub-button qualification |
 | Manual-image default is ARM | Require explicit architecture matching and actionable mismatch checks |
 | Switching build modes removes a protected managed repository from configuration | Implement a reviewed retention/migration path; do not bypass `prevent_destroy` |
 | Optional names submitted as explicit empty strings fail validation | Normalize optional blanks and test real Console serialization |

@@ -7,6 +7,20 @@ output "function_image" {
   value       = oci_functions_function.controller.image
 }
 
+output "build_review" {
+  description = "Native x86 build, delivery and scoped IAM evidence."
+  value = var.build_function_image ? {
+    project_id        = oci_devops_project.function[0].id
+    pipeline_id       = oci_devops_build_pipeline.function[0].id
+    run_id            = oci_devops_build_run.function[0].id
+    source_repository = oci_devops_repository.function[0].id
+    source_checksums  = local.function_source_checksums
+    builder_image     = oci_devops_build_pipeline_stage.build[0].image
+    policy_statements = local.build_policy_statements
+    home_region       = local.home_region
+  } : null
+}
+
 output "function_image_digest" {
   description = "Immutable image digest resolved by OCI Functions for the deployed image."
   value       = oci_functions_function.controller.image_digest

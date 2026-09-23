@@ -144,6 +144,7 @@ resource "oci_objectstorage_object" "budget_lock" {
 }
 
 resource "oci_identity_policy" "faas_service" {
+  provider       = oci.home
   count          = var.create_iam_resources ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = "${var.name_prefix}-faas-${local.suffix}"
@@ -201,13 +202,19 @@ resource "oci_functions_function" "controller" {
   application_id     = oci_functions_application.controller.id
   display_name       = "${var.name_prefix}-control"
   image              = local.effective_function_image
-  image_digest       = var.build_function_image || var.function_image_digest == "" ? null : var.function_image_digest
+  image_digest       = local.effective_image_digest
   memory_in_mbs      = 256
   timeout_in_seconds = 120
   freeform_tags      = local.tags
   config             = local.function_config
 
   lifecycle {
+    precondition {
+      condition = !var.build_function_image || try(
+        startswith(local.effective_function_image, "${local.image_repository_url}:build-") &&
+      can(regex("^sha256:[0-9a-f]{64}$", local.effective_image_digest)), false)
+      error_message = "The successful build must deliver a uniquely tagged image and SHA-256 digest to this stack's exact private OCIR repository."
+    }
     precondition {
       # A conservative UTF-8 serialized-JSON bound under OCI's 4-KB combined
       # configuration ceiling. Base64 counts bytes correctly for Unicode names.
@@ -229,10 +236,11 @@ resource "oci_functions_function" "controller" {
     }
   }
 
-  depends_on = [oci_objectstorage_object.budget_lock, terraform_data.function_image_build]
+  depends_on = [oci_objectstorage_object.budget_lock, oci_devops_build_run.function]
 }
 
 resource "oci_identity_dynamic_group" "controller" {
+  provider       = oci.home
   count          = var.create_iam_resources ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = local.dynamic_group_name
@@ -241,6 +249,7 @@ resource "oci_identity_dynamic_group" "controller" {
 }
 
 resource "oci_identity_policy" "controller" {
+  provider       = oci.home
   count          = var.create_iam_resources ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = "${var.name_prefix}-runtime-${local.suffix}"
@@ -251,6 +260,7 @@ resource "oci_identity_policy" "controller" {
 }
 
 resource "oci_identity_policy" "invokers" {
+  provider       = oci.home
   count          = var.create_iam_resources && length(local.effective_invoker_group_ocids) > 0 ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = "${var.name_prefix}-invoke-${local.suffix}"

@@ -176,11 +176,17 @@ That initial choice is then preserved for subsequent deployments.
 
 ### Build and deploy the Function in Resource Manager
 
+**Staging candidate:** a fresh Console test exposed an ARM64 Resource Manager
+host. Automatic builds now use an explicitly selected native x86 OCI DevOps
+runner instead. End-to-end qualification remains in progress; see the
+[deployment test record](docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md).
+
 Keep `build_function_image = true` (the default) to build from source.
 The stack creates a private repository in the selected OCIR
-compartment, builds `function/Dockerfile` for `linux/amd64` on the Resource Manager
-host, pushes the image, and deploys a `GENERIC_X86` Function. OCI resolves the
-image's SHA-256 digest during Function creation. The image address and digest
+compartment, creates a private OCI code repository and DevOps project/pipeline,
+builds `function/Dockerfile` for `linux/amd64` on `OL8_X86_64_STANDARD_10`,
+delivers the image using its resource principal, and deploys a `GENERIC_X86`
+Function pinned to the delivered image's digest. The image address and digest
 are deployment outputs, not values you need to look up. The Function's
 architecture is independent of the enrolled workers' architecture.
 
@@ -191,24 +197,29 @@ enabled; restrict registry push permissions. The repository remains private and
 protected against Terraform deletion.
 
 Select the compartments and existing Function VCN/subnets, then enter your
-**OCIR username** (for example, `Default/user`; the stack adds the tenancy
-namespace) and **OCIR auth token**. Generate a token from your OCI user profile
+**OCI source-publication username** (for example, `Default/user`; the stack adds
+the tenancy name) and **OCI auth token**. Generate a token from your OCI user profile
 under **Tokens and keys → Auth Tokens** if you do not already have one. The
-token's user needs permission to push images into the selected registry
-compartment. [Oracle auth-token instructions](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
+token's user needs read/update access to the new private OCI code repository.
+For compatibility these inputs remain named `ocir_username` and `ocir_auth_token`.
+[Oracle Git authentication instructions](https://docs.oracle.com/en-us/iaas/Content/devops/using/https_auth.htm)
 
-The builder detects Docker or Podman on the
-[Resource Manager Terraform host](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/terraformhost.htm),
-including hosts where `docker` is a Podman wrapper. It requires a native x86
-Linux engine and verifies the built image is `linux/amd64` before registry login
-or push. Podman uses an explicit temporary auth file; Docker uses a temporary
-config directory. The token goes to login over standard input, not command-line
-arguments or the build environment, and temporary credentials are removed on exit.
-No local Docker/Podman installation, separate build pipeline, or generated ZIP is
-needed for this path. Apply rebuilds when the included Function source or build
-helper changes. Base-image tags and downloaded dependencies can change between
-builds; use the existing-image option below when deploying a previously built
-artifact is required.
+Resource Manager publishes only five allowlisted files from the applied package
+on a fresh private source branch. Its temporary, repository-scoped Git credential
+helper is removed on exit. The token is never committed or passed to DevOps.
+The build verifies source checksums, native x86 engine and x86 output before
+delivery. Failed build/delivery prevents Function creation. No local container
+engine, prebuilt image, GitHub PAT or manually prepared pipeline is needed.
+Packaged source/build changes trigger a new build, with a unique tag per run.
+Base images/dependencies are not fully digest locked; use the existing-image
+option for a previously reviewed artifact.
+
+`create_build_iam_resources = true` creates home-region IAM scoped to this one
+pipeline, its source/artifact and its OCIR repository. Registry UPDATE can also
+permit image deletion; this is not a push-only grant. The build gets no worker,
+Function-deployment or secret-read permissions. Build logs and a Notifications
+topic are created, but no subscriptions or automatic triggers. Build IAM is
+independent of optional controller runtime IAM. Review all additions in Plan.
 
 If an earlier Apply failed with `can't evaluate field OSType` or a Podman
 `--config` warning, update the **existing stack's** configuration with the
@@ -217,10 +228,10 @@ Apply. Do not recreate the ledger, repository, application or logs. Clicking the
 button again starts a new stack; it does not update a preserved partial stack.
 A build failure before login does not validate the OCIR auth token.
 
-The auth token is a sensitive stack input used for registry login. Terraform
+The auth token is a sensitive stack input used for OCI code publication. Terraform
 1.5 can retain sensitive inputs in state and saved plans; protect Resource
 Manager stack access and never commit the token, populated variables, or state.
-IAM creation defaults to off: the required FaaS policies must already exist, or
+Controller runtime IAM creation defaults to off: required FaaS policies must already exist, or
 an authorized administrator can enable `create_iam_resources`. See the
 [deployment prerequisites](deploy/reference/README.md#1-prerequisites-and-ownership).
 

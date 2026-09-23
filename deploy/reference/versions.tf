@@ -13,7 +13,18 @@ terraform {
 
 # Authentication comes from the operator's OCI profile or workload identity.
 # Never put OCI API private keys in Terraform variables. The optional registry
-# auth token is a sensitive stack input, passed only to the image-build helper.
+# auth token is a sensitive stack input used only for private source publication.
 provider "oci" {
   region = var.region
+}
+
+data "oci_identity_tenancy" "current" { tenancy_id = var.tenancy_ocid }
+data "oci_identity_regions" "available" {}
+locals {
+  home_region = one([for region in data.oci_identity_regions.available.regions : region.name
+  if region.key == data.oci_identity_tenancy.current.home_region_key])
+}
+provider "oci" {
+  alias  = "home"
+  region = local.home_region
 }

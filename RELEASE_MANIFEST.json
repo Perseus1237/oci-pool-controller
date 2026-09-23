@@ -11,39 +11,39 @@
       "sha256": "c64b506bb10b98cd574e7f7234bff532191ab68a1682cd24daa8b98c216b88d1"
     },
     {
-      "bytes": 16209,
+      "bytes": 16648,
       "path": "deploy/reference/main.tf",
-      "sha256": "429ea443799ea6dc6e2452c908ec9fa00f942cac964e00e9d628d4ac8518906c"
+      "sha256": "6af6cd5079581d5d9de02eadc8c8b914ca5365ce11f3546205501d506489ad7a"
     },
     {
-      "bytes": 2191,
+      "bytes": 2805,
       "path": "deploy/reference/outputs.tf",
-      "sha256": "6313a8ab2bd9e02e81493d7e12443ee7e408e33aed9df892877079b7a7b9a1fa"
+      "sha256": "f86bb790d6b0fd4f14d11f943cdaa1eea4acdc08efefe2a0cd1161fde34735d7"
     },
     {
-      "bytes": 34050,
+      "bytes": 34728,
       "path": "deploy/reference/README.md",
-      "sha256": "caa50429c56fd9f917c6f9b23d8dbbfbec8ecedbf22933ad7815799569e705be"
+      "sha256": "f8cfd027b0cf14c384b2d10c23f98f51cae46a1535e313f8b2fdfe7f97264f0b"
     },
     {
       "path": "deploy/reference/schema.yaml",
-      "bytes": 10866,
-      "sha256": "5f454de3ede4100aa2eb23b701216fe26dafff8bfd1c105b43911f7d468a4132"
+      "bytes": 11583,
+      "sha256": "0f6808ee181653d20a5b7ae85f73efe99e533ecf3707570ea5aeb774f18e4656"
     },
     {
-      "bytes": 4031,
+      "bytes": 4203,
       "path": "deploy/reference/terraform.tfvars.example",
-      "sha256": "f1bc2ee234b4ba6da1091ee59584ab9ae9417ec976e67971bf99ae41d8c972b7"
+      "sha256": "4f376ae7b283456adbdd1b4995ec44b1eac7640e6dd44f748862dda59d817d7c"
     },
     {
-      "bytes": 12977,
+      "bytes": 13284,
       "path": "deploy/reference/variables.tf",
-      "sha256": "169474c00302efde413e0ad2ba2fd795158308586d8b79be06fde0b29c50d36b"
+      "sha256": "e2eec6694f917c13471322a705cd8771688ca24ae3b3e13eda4b1d1899a78fe1"
     },
     {
-      "bytes": 590,
+      "bytes": 949,
       "path": "deploy/reference/versions.tf",
-      "sha256": "61bddb1dd6d847e2456c9542435e8821284e3e9ada2f4396468e26d0c36a912e"
+      "sha256": "29a20a45588bfbc57e0138d7222059bae1111c21711b8d3414db1366f0503fb7"
     },
     {
       "bytes": 2225,
@@ -101,9 +101,9 @@
       "sha256": "177559f37a1a578917c5aa9caa0fec9e671513940263cf0febf68733ebb2780c"
     },
     {
-      "bytes": 23070,
+      "bytes": 23774,
       "path": "README.md",
-      "sha256": "451451d5bd2a98380dcc4130ba06af9a5a3fffbb0386d28dd8e02ce92d1f0fd3"
+      "sha256": "2d2119700a70c836d95167290d1fb1b68e96fff12f64d9830489d5bb3dbcc64d"
     },
     {
       "bytes": 2889,
@@ -122,23 +122,23 @@
     },
     {
       "path": "deploy/reference/image.tf",
-      "bytes": 2985,
-      "sha256": "d564c838dbd30482c5e03ebe6821b3c9d8a24fd495fc753fac843ac6937d48ed"
+      "bytes": 3442,
+      "sha256": "3f55d821172297cefdf1891e515916ebb8ae6d073a0b893f3018232f2e4c41bc"
     },
     {
       "path": "deploy/reference/build_function_image.py",
-      "bytes": 9731,
-      "sha256": "62ba9a5bc1c039b9a8e55fef0a446ec9382deb1bda0635dbdad719e7280776cb"
+      "bytes": 9915,
+      "sha256": "3bf1e2ab1ccbc8b11f7ec6022014bae8c52d9fd1ce0fa0b68c0045b04f407dd9"
     },
     {
       "path": "tests/test_resource_manager_image_build.py",
-      "bytes": 16161,
-      "sha256": "867cb5c2fd4f5418d25d5516a2959ff3cb4d96e26c4515d7457f794cc0067ed6"
+      "bytes": 16839,
+      "sha256": "b2fa705ac6443c17d1ad99c11e447003a3fcb4fa41a2fa71a1b54aa680cfa431"
     },
     {
       "path": "tests/test_resource_manager_deployment.py",
-      "bytes": 17986,
-      "sha256": "d8d4aea4856e9df0d633ab96c740047554e19e91377a33b4f25105e77a4f2277"
+      "bytes": 18881,
+      "sha256": "b42193752ddb4ffc2546bddbe1f05533c6c70e4a45204bc3fef1c1644221ff74"
     },
     {
       "path": "deploy/reference/enrollment.tf",
@@ -192,8 +192,38 @@
     },
     {
       "path": "docs/GETTING-STARTED.md",
-      "bytes": 23390,
-      "sha256": "5b8a57dd6ad321659344eb989cfad19984b683cb050366487ef0ed18a7a7db5d"
+      "bytes": 24392,
+      "sha256": "d835aff32fed5c2ca1838e280e6e88b9c6d0d754715cbfcfb0152c2ac7fdba4c"
+    },
+    {
+      "path": "deploy/reference/build.tf",
+      "bytes": 7461,
+      "sha256": "f2e24392a3d19dda62ed001827d15ea97fea0c01ecf3c51ad5f85074c5556699"
+    },
+    {
+      "path": "deploy/reference/build_spec.yaml",
+      "bytes": 525,
+      "sha256": "0a9bd435ab4fe12642a0607031ef9101d61f0b9214141e0d546b2d19e4456af3"
+    },
+    {
+      "path": "deploy/reference/native_build.py",
+      "bytes": 4357,
+      "sha256": "299b999aa9a990aeaeb83f653e84b0647258d1ca0460141e3c04127c5636e55e"
+    },
+    {
+      "path": "deploy/reference/publish_build_source.py",
+      "bytes": 5915,
+      "sha256": "50fd7f266a6de811324b7c29fae5b379e8883489de701b7b79024f8995e74910"
+    },
+    {
+      "path": "tests/test_native_build.py",
+      "bytes": 11298,
+      "sha256": "0b77b358bab425ceb79ef21ce82378842c876ccd934af82be2d90dae5587ba86"
+    },
+    {
+      "path": "docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md",
+      "bytes": 2913,
+      "sha256": "65bed9d42aa8453d394d7001238b67254001825123e429b5b68d396a98eb077c"
     }
   ],
   "release": "0.12.0-rc.6-reference-draft",

@@ -174,26 +174,35 @@ The inherited enrollment names `HarnessId` and `ScaleTestProfile` are retained f
 ### Default: build during Resource Manager Apply
 
 Keep `build_function_image = true` (the default). Provide `ocir_username` as your OCI
-domain/username, for example `Default/user`; the stack adds the tenancy's
-Object Storage namespace to form the registry login. Provide
+domain/username, for example `Default/user`; the stack adds the tenancy name
+to form the OCI Git login (not the Object Storage namespace). Provide
 `ocir_auth_token` from your OCI user profile's **Tokens and keys → Auth Tokens**
 section. This is an OCI auth token, not your account password.
 [Oracle's token instructions](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
 
-During Apply, the stack creates a private OCIR repository in
-`registry_compartment_ocid`, builds the included `function/Dockerfile` for
-`linux/amd64`, pushes the image, and deploys the Function as `GENERIC_X86`.
-The OCI Functions API resolves the image digest automatically. You do not enter
-an image address or digest, and you do not need a pre-existing repository,
-local Podman session, separate generated ZIP, or OCI DevOps pipeline.
-Resource Manager supplies the [build host](https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/terraformhost.htm).
-The helper detects Docker or Podman from engine information, including a
-`docker` executable backed by Podman. It requires native Linux x86 and checks
-the built image reports `linux/amd64` before authenticating or pushing. Podman
-uses `--platform linux/amd64` and a private `--authfile` for build/login/push;
-Docker retains its Docker 19-compatible build path and private `--config`.
-Credentials are sent only to login over standard input, never to the build
-environment or command line. Temporary auth/config files are removed on exit.
+**Staging candidate:** Resource Manager assigned an ARM64 host in the September
+22 fresh test. Automatic builds now use native x86 DevOps; live qualification is
+in progress. See the [test record](../../docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md).
+
+Apply creates private source and OCIR repositories, a DevOps project/pipeline,
+artifact, build log and notification topic without subscriptions. The publisher
+copies only three Function files, `native_build.py` and `build_spec.yaml` from
+the applied package onto a fresh private Git branch. The OCI auth token is used
+only for this publication, through a temporary repository-scoped credential
+helper, never in Git or the build runner.
+
+The build selects `OL8_X86_64_STANDARD_10`, verifies packaged source checksums and
+native/output `linux/amd64`, then delivers through resource-principal IAM.
+Terraform waits for successful delivery and pins the `GENERIC_X86` Function to
+the delivered digest. No local engine, prebuilt image, GitHub PAT or manually
+prepared pipeline is required. Resource Manager host architecture is irrelevant.
+
+`create_build_iam_resources` defaults to true, separately from runtime IAM. Its
+home-region dynamic group matches only this pipeline. Policies allow reading its
+source/artifact and REPOSITORY_READ/REPOSITORY_UPDATE on its OCIR repository.
+UPDATE is not push-only and can permit image deletion. No Compute, Function
+deployment or secret permissions are granted to the build. The pipeline waits
+120 seconds for propagation; review failures rather than broadening IAM.
 
 For a partial Apply that failed with `can't evaluate field OSType` or Podman's
 `--config` warning, update the same stack's Terraform configuration with the
@@ -262,7 +271,7 @@ In Resource Manager, configure the stack form. For local Terraform, copy `terraf
 
 The pool registry is currently inline Function configuration. [OCI limits combined Function/application configuration to 4 KB](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionspassingconfigparams-about.htm); this module conservatively rejects serialized configuration at approximately 4,000 bytes, including UTF-8 metadata. Raising `max_profiles` cannot override that service limit. Long pool identifiers/names reduce how many profiles fit. An external registry is not implemented. Separately reviewed, non-overlapping controller shards are an option, but each needs its own scope, ledger and budget allocation—there is no cross-controller aggregate guard. Do not add unreviewed application-level configuration outside Terraform.
 
-IAM creation defaults to **off** (`create_iam_resources = false`). With that setting:
+Controller runtime IAM creation defaults to **off** (`create_iam_resources = false`). Build IAM is independent (`create_build_iam_resources = true` for automatic builds). With runtime IAM off:
 
 1. The administrator preinstalls the two FaaS statements shown in `main.tf`, replacing the network/registry compartment placeholders. They must exist before creating the Function application/image.
 2. Deploy the Function with both safety switches unchanged.
@@ -353,7 +362,7 @@ stack.
 
 ### Local Terraform option
 
-From `deploy/reference`, after configuring the approved Terraform backend and OCI deployer credentials. Source-build mode also requires a working native Linux x86 Docker or Podman engine and the OCIR build credentials; the existing-image path does not require a container engine:
+From `deploy/reference`, after configuring the approved Terraform backend and OCI deployer credentials. Source-build mode requires Python 3, Git and OCI source-publication credentials locally, plus permission to create the native x86 DevOps build workflow. It does not need a local container engine. The existing-image path requires neither source-publication credentials nor a build pipeline:
 
 ```sh
 terraform init

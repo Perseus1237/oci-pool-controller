@@ -75,19 +75,25 @@ variable "scope_id" {
 }
 
 variable "build_function_image" {
-  description = "Build the included Function source during Apply and create its private OCIR repository automatically. Requires a native x86 Linux Docker host (available in OCI Resource Manager)."
+  description = "Build source on native x86 OCI DevOps during Apply, deliver to private OCIR, then deploy an x86 Function. The Resource Manager host architecture is irrelevant."
+  type        = bool
+  default     = true
+}
+
+variable "create_build_iam_resources" {
+  description = "Create scoped home-region IAM for the build pipeline only. Disable only when central IAM supplies the equivalent build-policy output. Independent of controller runtime IAM."
   type        = bool
   default     = true
 }
 
 variable "ocir_username" {
-  description = "OCI username, including identity domain where applicable (for example Default/user@example.com). The tenancy namespace is added automatically. Used only for automatic builds."
+  description = "OCI username including identity domain (for example Default/user@example.com). Publishes packaged source to its private OCI code repository; namespace is added automatically. Variable name retained for compatibility."
   type        = string
   default     = ""
 }
 
 variable "ocir_auth_token" {
-  description = "OCI auth token for the registry user, not the Console password. Used only for automatic builds. Protect stack variables and state; sensitive does not make Terraform 1.5 values ephemeral."
+  description = "OCI auth token for source publication, not the Console password. Never passed to the build runner or stored in Git; image delivery uses resource-principal IAM. Protect stack variables and state."
   type        = string
   sensitive   = true
   default     = ""

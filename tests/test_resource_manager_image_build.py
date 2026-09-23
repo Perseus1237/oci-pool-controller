@@ -207,6 +207,7 @@ class ImageBuildTests(unittest.TestCase):
         cases = (
             ("docker", {"OSType": "linux", "Architecture": "amd64"}),
             ("podman", {"Host": {"OS": "linux", "Arch": "amd64"}}),
+            ("podman", {"Host": {"Os": "linux", "Arch": "amd64"}}),
             ("podman", {"host": {"os": "linux", "arch": "x86_64"}}),
         )
         for engine, info in cases:
@@ -221,6 +222,18 @@ class ImageBuildTests(unittest.TestCase):
                 self.run_build(variant)
                 self.assertEqual(self.steps()[-1], "push")
                 self.assert_cleaned_up()
+
+    def test_resource_manager_arm_docker_shim_reports_actual_platform(self):
+        self.engine, self.binary = "podman", "docker"
+        def arm_shim(command, **kwargs):
+            result = self.fake_docker(command, **kwargs)
+            result.stdout = json.dumps({"host": {"os": "linux", "arch": "arm64"}})
+            return result
+        with self.assertRaisesRegex(builder.BuildError,
+                                    "Detected podman via docker reports platform linux/arm64"):
+            self.run_build(arm_shim)
+        self.assertEqual(self.steps(), ["info"])
+        self.assert_cleaned_up()
 
     def test_non_linux_engine_cannot_build_or_authenticate(self):
         def windows(command, **kwargs):

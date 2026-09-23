@@ -144,7 +144,7 @@ def build_and_push(environment=None):
         host = info.get("host", info.get("Host"))
         if isinstance(host, dict):
             engine = "podman"
-            operating_system = host.get("os", host.get("OS"))
+            operating_system = host.get("os", host.get("OS", host.get("Os")))
             architecture = host.get("arch", host.get("Arch"))
         elif "OSType" in info and "Architecture" in info:
             engine = "docker"
@@ -152,8 +152,10 @@ def build_and_push(environment=None):
         else:
             raise BuildError("Unrecognized container-engine info; image build/push cancelled")
         if operating_system != "linux" or architecture not in ("amd64", "x86_64"):
-            raise BuildError("The automatic Function build requires a native linux/amd64 builder; "
-                             "use a native x86 runner or supply a reviewed prebuilt image")
+            raise BuildError("Detected {} via {} reports platform {}/{}. The automatic Function "
+                             "build requires a native linux/amd64 builder; use a native x86 "
+                             "runner or supply a reviewed prebuilt image".format(
+                                 engine, executable, operating_system, architecture))
 
         def container(arguments, **kwargs):
             if engine == "docker":

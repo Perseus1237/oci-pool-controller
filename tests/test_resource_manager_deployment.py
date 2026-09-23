@@ -137,13 +137,30 @@ outputs:
 
     def test_source_build_keeps_unique_attempt_tags_and_function_dependency(self):
         source = (ROOT / "deploy/reference/image.tf").read_text(encoding="utf-8")
-        self.assertIn('${local.image_repository_url}:build-${terraform_data.function_image_build[0].id}', source)
-        self.assertIn('${local.image_repository_url}:build-${self.id}', source)
+        self.assertIn('"build-${self.id}"', source)
+        self.assertIn('local.delivered_image.image_uri', source)
+        self.assertIn('local.delivered_image.delivered_artifact_hash', source)
         self.assertRegex(source, r"source_hash\s*=\s*local\.function_source_hash")
         self.assertRegex(source, r"repository_id\s*=\s*oci_artifacts_container_repository\.function\[0\]\.id")
         main = (ROOT / "deploy/reference/main.tf").read_text(encoding="utf-8")
         self.assertRegex(main, r"image\s*=\s*local\.effective_function_image")
-        self.assertRegex(main, r'image_digest\s*=\s*var\.build_function_image \|\| var\.function_image_digest == "" \? null : var\.function_image_digest')
+        self.assertRegex(main, r'image_digest\s*=\s*local\.effective_image_digest')
+        self.assertIn('oci_devops_build_run.function', main)
+
+    def test_native_devops_build_and_home_region_scoped_iam(self):
+        build = (ROOT / "deploy/reference/build.tf").read_text()
+        self.assertIn('"OL8_X86_64_STANDARD_10"', build)
+        self.assertIn('"DELIVER_ARTIFACT"', build)
+        self.assertIn('self.state == "SUCCEEDED"', build)
+        self.assertIn('target.repository.id', build)
+        self.assertIn('target.artifact.id', build)
+        self.assertIn('target.repo.name', build)
+        for forbidden in ('manage all-resources', 'manage instances', 'secret-family', 'REPOSITORY_CREATE', 'ocir_auth_token'):
+            self.assertNotIn(forbidden, build)
+        self.assertIn("resource.id = '${oci_devops_build_pipeline.function[0].id}'", build)
+        versions = (ROOT / "deploy/reference/versions.tf").read_text()
+        self.assertIn('home_region_key', versions)
+        self.assertIn('region = local.home_region', versions)
 
     def test_new_stack_defaults_to_standby_without_pool_inputs(self):
         schema = (ROOT / SCHEMA_PATH).read_text(encoding="utf-8")
