@@ -1,8 +1,10 @@
-"""Verify image-build boundaries without contacting Docker or an OCI tenancy."""
+"""Verify Docker/Podman image-build boundaries without an OCI tenancy."""
 
+import base64
 import contextlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -36,34 +38,71 @@ class ImageBuildTests(unittest.TestCase):
             "TF_VAR_ocir_auth_token": self.token,
             "OCI_CLI_KEY_CONTENT": "another-secret",
             "DOCKER_CONFIG": "/operator/existing/docker-config",
+            "REGISTRY_AUTH_FILE": "/operator/existing/auth.json",
+            "DOCKER_DEFAULT_PLATFORM": "linux/arm64",
         }
+        self.engine = "docker"
+        self.binary = "docker"
         self.calls = []
         self.temporary_paths = set()
 
+    def step(self, command):
+        return command[3] if command[1] == "--config" else command[1]
+
+    def steps(self):
+        return [self.step(command) for command, _ in self.calls]
+
     def fake_docker(self, command, **kwargs):
         self.calls.append((command, kwargs))
-        self.assertEqual(command[:2], ["docker", "--config"])
-        config = Path(command[2])
+        self.assertEqual(command[0], self.binary)
+        config = Path(kwargs["env"]["DOCKER_CONFIG"])
+        authfile = Path(kwargs["env"]["REGISTRY_AUTH_FILE"])
         self.temporary_paths.add(config.parent)
         self.assertTrue(config.is_dir())
         self.assertEqual(config.stat().st_mode & 0o777, 0o700)
-        step = command[3]
+        self.assertEqual(authfile.parent, config.parent)
+        self.assertEqual(authfile.stat().st_mode & 0o777, 0o600)
+        self.assertEqual((config / "config.json").stat().st_mode & 0o777, 0o600)
+        step = self.step(command)
+        if step == "info":
+            self.assertEqual(command[1:], ["info", "--format", "{{json .}}"])
+            self.assertEqual(json.loads(authfile.read_text()), {"auths": {}})
+            self.assertEqual(json.loads((config / "config.json").read_text()), {"auths": {}})
+        elif self.engine == "docker":
+            self.assertEqual(command[1:3], ["--config", str(config)])
+            self.assertNotIn("--authfile", command)
+        else:
+            self.assertNotIn("--config", command)
+            if step in ("build", "login", "push"):
+                self.assertEqual(command[2:4], ["--authfile", str(authfile)])
         if step == "build":
             context = Path(command[-1])
             self.assertEqual(set(path.name for path in context.iterdir()), set(builder.SOURCE_FILES))
             for filename in builder.SOURCE_FILES:
                 self.assertEqual((context / filename).read_bytes(), (self.source / filename).read_bytes())
-            self.assertNotIn("--platform", command)
+            if self.engine == "podman":
+                self.assertEqual(command[command.index("--platform") + 1], "linux/amd64")
+            else:
+                self.assertNotIn("--platform", command)  # Docker 19 compatibility.
             self.assertNotIn("buildx", command)
         if step == "login":
-            (config / "config.json").write_text(self.token, encoding="utf-8")
-        output = {"info": "linux/x86_64\n", "image": "linux/amd64\n", "push": "digest: sha256:test\n"}.get(step, "")
+            credential_file = authfile if self.engine == "podman" else config / "config.json"
+            credential_file.write_text(self.token, encoding="utf-8")
+        info = {"OSType": "linux", "Architecture": "x86_64"} if self.engine == "docker" else {
+            "host": {"os": "linux", "arch": "amd64"}, "version": {"Version": "4.9.4"},
+        }
+        output = {"info": json.dumps(info), "image": json.dumps([
+            {"Os": "linux", "Architecture": "amd64"}
+        ]), "push": "digest: sha256:test\n"}.get(step, "")
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
     def run_build(self, side_effect=None):
-        with mock.patch.object(builder.subprocess, "run", side_effect=side_effect or self.fake_docker):
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                builder.build_and_push(self.environment)
+        with mock.patch.object(builder.shutil, "which", side_effect=lambda name, **kw: (
+                "/usr/bin/" + name if name == self.binary else None)):
+            with mock.patch.object(builder.subprocess, "run", side_effect=side_effect or self.fake_docker):
+                with contextlib.redirect_stdout(io.StringIO()) as output, contextlib.redirect_stderr(io.StringIO()):
+                    builder.build_and_push(self.environment)
+                    return output.getvalue()
 
     def assert_cleaned_up(self):
         self.assertTrue(self.temporary_paths)
@@ -72,48 +111,50 @@ class ImageBuildTests(unittest.TestCase):
 
     def test_credentials_are_stdin_only_and_context_is_allowlisted(self):
         self.run_build()
-        self.assertEqual([command[3] for command, _ in self.calls], ["info", "build", "image", "login", "push"])
+        self.assertEqual(self.steps(), ["info", "build", "image", "login", "push"])
         for command, kwargs in self.calls:
             self.assertNotIn(self.token, " ".join(command))
-            self.assertEqual(kwargs["env"], {"PATH": "/usr/bin:/bin"})
+            self.assertEqual(set(kwargs["env"]), {"PATH", "DOCKER_CONFIG", "REGISTRY_AUTH_FILE"})
+            self.assertNotIn(self.token, repr(kwargs["env"]))
+            self.assertNotIn("/operator/existing", repr(kwargs["env"]))
             self.assertNotIn("shell", kwargs)
             self.assertIs(kwargs["universal_newlines"], True)
             self.assertEqual(kwargs["stdout"], subprocess.PIPE)
             self.assertEqual(kwargs["stderr"], subprocess.PIPE)
-            self.assertEqual(kwargs["input"], self.token + "\n" if command[3] == "login" else None)
+            self.assertEqual(kwargs["input"], self.token + "\n" if self.step(command) == "login" else None)
         self.assert_cleaned_up()
 
     def test_non_x86_daemon_fails_before_build_or_login(self):
         def arm_daemon(command, **kwargs):
             result = self.fake_docker(command, **kwargs)
-            result.stdout = "linux/aarch64\n"
+            result.stdout = json.dumps({"OSType": "linux", "Architecture": "aarch64"})
             return result
         with self.assertRaisesRegex(builder.BuildError, "native linux/amd64"):
             self.run_build(arm_daemon)
-        self.assertEqual([command[3] for command, _ in self.calls], ["info"])
+        self.assertEqual(self.steps(), ["info"])
         self.assert_cleaned_up()
 
     def test_wrong_image_architecture_prevents_login_and_push(self):
         def wrong_image(command, **kwargs):
             result = self.fake_docker(command, **kwargs)
-            if command[3] == "image":
-                result.stdout = "linux/arm64\n"
+            if self.step(command) == "image":
+                result.stdout = json.dumps([{"Os": "linux", "Architecture": "arm64"}])
             return result
         with self.assertRaisesRegex(builder.BuildError, "not linux/amd64"):
             self.run_build(wrong_image)
-        self.assertEqual([command[3] for command, _ in self.calls], ["info", "build", "image"])
+        self.assertEqual(self.steps(), ["info", "build", "image"])
         self.assert_cleaned_up()
 
     def test_push_failure_cleans_credentials_and_redacts_output(self):
         def failed_push(command, **kwargs):
             result = self.fake_docker(command, **kwargs)
-            if command[3] == "push":
+            if self.step(command) == "push":
                 result.returncode = 1
                 result.stderr = "registry rejected " + self.token
             return result
         with self.assertRaises(builder.BuildError) as raised:
             self.run_build(failed_push)
-        self.assertIn("Docker push failed", str(raised.exception))
+        self.assertIn("docker command failed", str(raised.exception))
         self.assertNotIn(self.token, str(raised.exception))
         self.assertIn("[redacted]", str(raised.exception))
         self.assert_cleaned_up()
@@ -121,13 +162,98 @@ class ImageBuildTests(unittest.TestCase):
     def test_failed_build_prevents_login_and_push(self):
         def failed_build(command, **kwargs):
             result = self.fake_docker(command, **kwargs)
-            if command[3] == "build":
+            if self.step(command) == "build":
                 result.returncode = 1
                 result.stderr = "Dockerfile failed"
             return result
-        with self.assertRaisesRegex(builder.BuildError, "Docker build failed"):
+        with self.assertRaisesRegex(builder.BuildError, "docker command failed"):
             self.run_build(failed_build)
-        self.assertEqual([command[3] for command, _ in self.calls], ["info", "build"])
+        self.assertEqual(self.steps(), ["info", "build"])
+        self.assert_cleaned_up()
+
+    def test_native_podman_and_docker_shim_use_private_authfile(self):
+        for binary in ("podman", "docker"):
+            with self.subTest(binary=binary):
+                self.engine, self.binary = "podman", binary
+                self.calls.clear()
+                output = self.run_build()
+                self.assertIn("Detected podman via " + binary, output)
+                self.assertIn("Verified built Function image: linux/amd64 (GENERIC_X86)", output)
+                self.assertEqual(self.steps(), ["info", "build", "image", "login", "push"])
+                for command, kwargs in self.calls:
+                    self.assertNotIn("--config", command)
+                    self.assertNotIn(self.token, repr(command) + repr(kwargs["env"]))
+                    self.assertEqual(kwargs["input"], self.token + "\n" if self.step(command) == "login" else None)
+                self.assert_cleaned_up()
+
+    def test_podman_arm_host_or_image_cannot_be_pushed(self):
+        self.engine, self.binary = "podman", "podman"
+        for failing_step in ("info", "image"):
+            with self.subTest(step=failing_step):
+                self.calls.clear()
+                def arm(command, **kwargs):
+                    result = self.fake_docker(command, **kwargs)
+                    if self.step(command) == failing_step:
+                        result.stdout = json.dumps({"host": {"os": "linux", "arch": "arm64"}} if
+                                                   failing_step == "info" else [{"Os": "linux", "Architecture": "arm64"}])
+                    return result
+                with self.assertRaises(builder.BuildError):
+                    self.run_build(arm)
+                self.assertNotIn("login", self.steps())
+                self.assertNotIn("push", self.steps())
+                self.assert_cleaned_up()
+
+    def test_malformed_or_unknown_engine_and_image_info_fail_closed(self):
+        for step, response in (("info", "not json"), ("info", "[]"), ("info", "{}"),
+                               ("info", '{"host": null}'), ("image", "not json"),
+                               ("image", "{}"), ("image", "[]"), ("image", "[null]")):
+            with self.subTest(step=step, response=response):
+                self.calls.clear()
+                def invalid(command, **kwargs):
+                    result = self.fake_docker(command, **kwargs)
+                    if self.step(command) == step:
+                        result.stdout = response
+                    return result
+                with self.assertRaises(builder.BuildError):
+                    self.run_build(invalid)
+                self.assertNotIn("login", self.steps())
+                self.assertNotIn("push", self.steps())
+                self.assert_cleaned_up()
+
+    def test_podman_failures_redact_credentials_and_always_clean_up(self):
+        self.engine, self.binary = "podman", "docker"
+        encoded = base64.b64encode((self.environment["POOL_OCIR_USERNAME"] + ":" + self.token).encode()).decode()
+        for step in ("info", "build", "image", "login", "push"):
+            with self.subTest(step=step):
+                self.calls.clear()
+                def fail(command, **kwargs):
+                    result = self.fake_docker(command, **kwargs)
+                    if self.step(command) == step:
+                        result.returncode = 1
+                        result.stderr = "rejected " + self.token + " " + encoded
+                    return result
+                with self.assertRaises(builder.BuildError) as raised:
+                    self.run_build(fail)
+                self.assertNotIn(self.token, str(raised.exception))
+                self.assertNotIn(encoded, str(raised.exception))
+                self.assertIn("[redacted]", str(raised.exception))
+                self.assertEqual(self.steps()[-1], step)
+                self.assert_cleaned_up()
+
+    def test_missing_engine_fails_before_subprocess(self):
+        with mock.patch.object(builder.shutil, "which", return_value=None), mock.patch.object(builder.subprocess, "run") as run:
+            with self.assertRaisesRegex(builder.BuildError, "Docker or Podman"):
+                builder.build_and_push(self.environment)
+            run.assert_not_called()
+
+    def test_unavailable_engine_does_not_fallback_or_expose_token(self):
+        def unavailable(command, **kwargs):
+            self.fake_docker(command, **kwargs)
+            raise OSError("connection failed " + self.token)
+        with self.assertRaises(builder.BuildError) as raised:
+            self.run_build(unavailable)
+        self.assertNotIn(self.token, str(raised.exception))
+        self.assertEqual(self.steps(), ["info"])
         self.assert_cleaned_up()
 
     def test_image_and_registry_reject_options_or_unmatched_targets(self):

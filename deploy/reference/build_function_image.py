@@ -3,11 +3,13 @@
 
 The Terraform caller supplies POOL_IMAGE, POOL_REGISTRY, POOL_OCIR_USERNAME,
 POOL_OCIR_AUTH_TOKEN and POOL_FUNCTION_SOURCE_DIR in the environment. Registry
-credentials go only to Docker login's standard input and temporary config.
-This uses Docker 19-compatible commands and the native x86 Resource Manager
-worker; no Docker Buildx plugin or emulation is required.
+credentials go only to the detected engine's login standard input and temporary
+auth files. Supports Docker (including 19.x), native Podman, and podman-docker
+wrappers on a native x86 Linux builder; no Buildx or emulation is required.
 """
 
+import base64
+import json
 import os
 from pathlib import Path
 import re
@@ -18,12 +20,13 @@ import tempfile
 
 
 SOURCE_FILES = ("Dockerfile", "func.py", "requirements.txt")
-# Preserve only what Docker needs to find its daemon and reach registries.
+# Preserve only what the engine needs to find its service and reach registries.
 # In particular, Terraform variables and OCI credentials must not reach builds.
-DOCKER_ENV_KEYS = (
+ENGINE_ENV_KEYS = (
     "PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR",
     "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
     "DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "DOCKER_API_VERSION",
+    "XDG_RUNTIME_DIR", "CONTAINER_HOST", "CONTAINER_CONNECTION", "CONTAINER_SSHKEY",
 )
 
 
@@ -71,35 +74,53 @@ def configuration(environment):
 def build_and_push(environment=None):
     environment = os.environ if environment is None else environment
     registry, image, username, token, source = configuration(environment)
-    docker_environment = {
-        key: environment[key] for key in DOCKER_ENV_KEYS
+    engine_environment = {
+        key: environment[key] for key in ENGINE_ENV_KEYS
         if key in environment and token not in environment[key]
     }
+    executable = next((name for name in ("docker", "podman")
+                       if shutil.which(name, path=engine_environment.get("PATH", os.defpath))), None)
+    if executable is None:
+        raise BuildError("Automatic builds require Docker or Podman on a native linux/amd64 builder")
+    secrets = (token, base64.b64encode((username + ":" + token).encode()).decode())
+
+    def redact(value):
+        for secret in secrets:
+            value = value.replace(secret, "[redacted]")
+        return value
 
     with tempfile.TemporaryDirectory(prefix="oci-pool-function-build-") as temporary:
         root = Path(temporary)
         config = root / "docker-config"
+        authfile = root / "registry-auth.json"
         context = root / "context"
         config.mkdir(mode=0o700)
         context.mkdir(mode=0o700)
+        for path in (config / "config.json", authfile):
+            path.write_text('{"auths": {}}\n', encoding="utf-8")
+            path.chmod(0o600)
+        # Never inherit the operator's registry credentials or credential helpers.
+        # Set these even for the detection probe, before we know the engine.
+        engine_environment["DOCKER_CONFIG"] = str(config)
+        engine_environment["REGISTRY_AUTH_FILE"] = str(authfile)
         for filename in SOURCE_FILES:
             shutil.copyfile(source / filename, context / filename)
 
-        def docker(arguments, stdin=None, display=True):
-            command = ["docker", "--config", str(config)] + arguments
+        def run(arguments, stdin=None, display=True):
+            command = [executable] + arguments
             try:
                 result = subprocess.run(
                     command, input=stdin, universal_newlines=True,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                    env=docker_environment, check=False,
+                    env=engine_environment, check=False,
                 )
             except OSError as error:
-                raise BuildError("Unable to start Docker: {}".format(str(error).replace(token, "[redacted]")))
-            stdout = (result.stdout or "").replace(token, "[redacted]")
-            stderr = (result.stderr or "").replace(token, "[redacted]")
+                raise BuildError("Unable to start {}: {}".format(executable, redact(str(error))))
+            stdout = redact(result.stdout or "")
+            stderr = redact(result.stderr or "")
             if result.returncode:
-                raise BuildError("Docker {} failed (exit {}): {}".format(
-                    arguments[0], result.returncode, (stderr or stdout).strip()
+                raise BuildError("{} command failed (exit {}): {}".format(
+                    executable, result.returncode, (stderr or stdout).strip()
                 ))
             if display:
                 if stdout:
@@ -108,23 +129,59 @@ def build_and_push(environment=None):
                     print(stderr, end="" if stderr.endswith("\n") else "\n", file=sys.stderr)
             return stdout.strip()
 
-        daemon_platform = docker(["info", "--format", "{{.OSType}}/{{.Architecture}}"], display=False)
-        if daemon_platform not in ("linux/amd64", "linux/x86_64"):
-            raise BuildError("The automatic Function build requires a native linux/amd64 Docker daemon")
-        print("Building Function image for linux/amd64.", flush=True)
+        def json_result(arguments):
+            try:
+                return json.loads(run(arguments, display=False))
+            except ValueError:
+                raise BuildError("{} returned invalid JSON; image build/push cancelled".format(executable))
+
+        # Both engines support serializing the complete info object, but Podman
+        # has host.os/host.arch, NOT Docker's OSType/Architecture template fields.
+        # Inspect the response, not the executable name: docker may be a shim.
+        info = json_result(["info", "--format", "{{json .}}"])
+        if not isinstance(info, dict):
+            raise BuildError("Unrecognized container-engine info; image build/push cancelled")
+        host = info.get("host", info.get("Host"))
+        if isinstance(host, dict):
+            engine = "podman"
+            operating_system = host.get("os", host.get("OS"))
+            architecture = host.get("arch", host.get("Arch"))
+        elif "OSType" in info and "Architecture" in info:
+            engine = "docker"
+            operating_system, architecture = info["OSType"], info["Architecture"]
+        else:
+            raise BuildError("Unrecognized container-engine info; image build/push cancelled")
+        if operating_system != "linux" or architecture not in ("amd64", "x86_64"):
+            raise BuildError("The automatic Function build requires a native linux/amd64 builder; "
+                             "use a native x86 runner or supply a reviewed prebuilt image")
+
+        def container(arguments, **kwargs):
+            if engine == "docker":
+                arguments = ["--config", str(config)] + arguments
+            elif arguments[0] in ("build", "login", "push"):
+                arguments = arguments[:1] + ["--authfile", str(authfile)] + arguments[1:]
+            return run(arguments, **kwargs)
+
+        print("Detected {} via {}; building Function image for linux/amd64.".format(engine, executable), flush=True)
         # Docker 19 gates --platform behind experimental/BuildKit support.
         # The native daemon check above and image check below enforce x86
         # without requiring those optional features on the RM worker.
-        docker([
-            "build", "--file", str(context / "Dockerfile"), "--tag", image, str(context),
+        platform = ["--platform", "linux/amd64"] if engine == "podman" else []
+        container(["build"] + platform + [
+            "--file", str(context / "Dockerfile"), "--tag", image, str(context),
         ])
-        image_platform = docker([
-            "image", "inspect", "--format", "{{.Os}}/{{.Architecture}}", image,
-        ], display=False)
-        if image_platform != "linux/amd64":
+        try:
+            inspected = json.loads(container(["image", "inspect", image], display=False))
+        except ValueError:
+            raise BuildError("Image inspection returned invalid JSON; registry push was cancelled")
+        if (not isinstance(inspected, list) or len(inspected) != 1
+                or not isinstance(inspected[0], dict)
+                or inspected[0].get("Os") != "linux"
+                or inspected[0].get("Architecture") != "amd64"):
             raise BuildError("Built Function image is not linux/amd64; registry push was cancelled")
-        docker(["login", "--username", username, "--password-stdin", registry], stdin=token + "\n")
-        docker(["push", image])
+        print("Verified built Function image: linux/amd64 (GENERIC_X86).", flush=True)
+        container(["login", "--username", username, "--password-stdin", registry], stdin=token + "\n")
+        container(["push", image])
         print("Function image pushed successfully; OCI Functions will resolve its immutable digest.")
 
 
