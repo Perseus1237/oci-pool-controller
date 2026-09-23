@@ -2,7 +2,7 @@
 
 Prepared September 18, 2026. Reviewed source: `52528e6ffee7fc08511c1116db0ad4bacadade43` in [Perseus1237/oci-pool-controller](https://github.com/Perseus1237/oci-pool-controller/tree/52528e6ffee7fc08511c1116db0ad4bacadade43).
 
-**Status: preparation guide for a staging reference implementation, not production certification.** The September 23 deployment correction passed recovered-stack x86 build/push, Function creation and signed standby invocation. Clean one-click qualification is still pending; see the [deployment test record](RESOURCE-MANAGER-BUILD-TEST-20260922.md). The repository describes this as unsupported sample code.
+**Status: preparation guide for a staging reference implementation, not production certification.** The September 23 correction passed a fresh GitHub-button stack's x86 build/private push, Function creation and signed standby invocation using an existing staging network. No workers were launched; see the [deployment test record](RESOURCE-MANAGER-BUILD-TEST-20260922.md). The repository describes this as unsupported sample code.
 
 ## 1. Understand what you are deploying
 
@@ -89,9 +89,10 @@ Custom worker images, subnets, encrypted volumes or keys in other compartments c
 
 ### Path A: automatic build, intended one-click experience
 
-**Live qualification in progress:** Resource Manager assigned an ARM64 Podman
-host in the fresh test. The candidate now uses an explicit native x86 OCI DevOps
-runner; the Docker/Podman compatibility fix alone was insufficient.
+**Fresh-stack deployment passed:** Resource Manager assigned an ARM64 Podman
+host in the original test. The corrected stack uses an explicit native x86 OCI
+DevOps runner and passed build/private push/deploy/standby invocation through
+the GitHub button. The Docker/Podman compatibility fix alone was insufficient.
 See the [test record](RESOURCE-MANAGER-BUILD-TEST-20260922.md).
 
 Select **Build and deploy the Function automatically**. Prepare:
@@ -266,8 +267,8 @@ Add Gateway only for an agreed additional HTTP API requirement. It needs fronten
 | Issue in reviewed source | Required disposition |
 | --- | --- |
 | Home-region IAM | Candidate discovers the tenancy home region for IAM writes; qualify same/different deployment-region cases |
-| Docker/Podman build compatibility | Corrected helper has offline engine/auth/architecture regression coverage; qualify build/push/deploy/invoke on the actual Resource Manager host |
-| Resource Manager assigned an ARM64 build host | Candidate uses native x86 DevOps; complete live build/delivery/invocation and clean GitHub-button qualification |
+| Docker/Podman build compatibility | Offline engine/auth/architecture tests pass; automatic deployment uses native DevOps rather than building on the Resource Manager host |
+| Resource Manager assigned an ARM64 build host | Native x86 DevOps passed fresh GitHub-button build/private delivery/deployment/standby invocation in Ashburn; other environments remain to be qualified |
 | Manual-image default is ARM | Require explicit architecture matching and actionable mismatch checks |
 | Switching build modes removes a protected managed repository from configuration | Implement a reviewed retention/migration path; do not bypass `prevent_destroy` |
 | Optional names submitted as explicit empty strings fail validation | Normalize optional blanks and test real Console serialization |

@@ -184,9 +184,10 @@ That initial choice is then preserved for subsequent deployments.
 
 **Staging candidate:** a fresh Console test exposed an ARM64 Resource Manager
 host. Automatic builds now use an explicitly selected native x86 OCI DevOps
-runner instead. Recovered-stack build, push, x86 Function deployment and signed
-standby invocation have passed; a clean GitHub-button deployment remains to be
-qualified. See the
+runner instead. A fresh GitHub-button stack passed build, private OCIR push,
+x86 Function deployment and signed standby invocation on September 23 using an
+existing staging network. No workers were launched; this is not production
+scaling certification. See the
 [deployment test record](docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md).
 
 Keep `build_function_image = true` (the default) to build from source.

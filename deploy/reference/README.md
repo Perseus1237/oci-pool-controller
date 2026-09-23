@@ -181,8 +181,11 @@ section. This is an OCI auth token, not your account password.
 [Oracle's token instructions](https://docs.oracle.com/en-us/iaas/Content/Registry/Tasks/registrygettingauthtoken.htm)
 
 **Staging candidate:** Resource Manager assigned an ARM64 host in the September
-22 fresh test. Automatic builds now use native x86 DevOps; live qualification is
-in progress. See the [test record](../../docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md).
+22 fresh test. Automatic builds now use native x86 DevOps. A separate fresh
+GitHub-button stack passed build, private push, x86 Function deployment and
+signed standby invocation on September 23 using an existing staging network.
+This does not qualify worker scaling or production use. See the
+[test record](../../docs/RESOURCE-MANAGER-BUILD-TEST-20260922.md).
 
 Apply creates private source and OCIR repositories, a DevOps project/pipeline,
 artifact, build log and notification topic without subscriptions. The publisher

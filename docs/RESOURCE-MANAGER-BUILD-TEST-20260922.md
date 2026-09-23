@@ -2,9 +2,9 @@
 
 ## Outcome
 
-**Recovered deployment passed: native x86 build, private OCIR delivery, Function creation and signed standby invocation.**
+**Clean GitHub-button deployment passed: native x86 build, private OCIR delivery, Function creation and signed standby invocation.**
 The original Resource Manager-local build was blocked before image build/push and Function deployment.
-This is not yet a clean one-click qualification. No ARM Function was deployed: the requested
+The corrected source subsequently passed a separate fresh-stack test described below. No ARM Function was deployed: the requested
 Function architecture remained `GENERIC_X86`, and the target image `linux/amd64`.
 
 ## Scope and observed results
@@ -135,10 +135,43 @@ to the build runner. Runtime IAM remains disabled and no pools are enrolled.
   production readiness and a clean-stack deployment are not established by this
   standby smoke test.
 
+## Clean GitHub-button acceptance — September 23, 2026
+
+- Created a separate empty-state stack through the public GitHub README button
+  using published revision `31550ba`. The downloaded deployment and Function
+  files matched the local published source byte-for-byte. Working directory:
+  `oci-pool-controller-main/deploy/reference`; Terraform 1.5.x.
+- Used the existing staging private Function subnet in Ashburn. This tests a
+  fresh stack, not provisioning an empty tenancy or new network.
+- Reviewed Plan contained 25 additions and no changes/deletions. No worker or
+  network resources were created. Automatic Apply was disabled; the exact saved
+  Plan was selected in the Console after approval.
+- Enabled scoped build IAM and runtime IAM creation. The pipeline manages only
+  its own OCIR repository, with the documented source/metadata access. Runtime
+  grants cover the exact Function's own ledger objects and compartment-scoped
+  FaaS networking/image reads; no pool/worker permissions or caller-group grants.
+- The first Apply succeeded at 08:55:46 UTC, approximately 14 minutes after
+  submission. No source replacement, manual IAM repair, retry or prebuilt image
+  was required. Existing stacks and their state were left untouched.
+- Native build used `VM.Standard.E5.Flex`, 2 OCPUs / 8 GB. Source download,
+  checksums, native x86 image build and architecture verification passed. The
+  image-build step ran from 08:47:17 to 08:50:37 UTC (approximately 200 seconds).
+  Both BUILD and private OCIR DELIVER stages succeeded.
+- Function was ACTIVE in a `GENERIC_X86` application. Its image digest matched
+  the exact private registry image and successful build-run tag:
+  `sha256:d2a5ed7fc99baeebb0e06d654b0222b9b4b59a062fb4ece2d48e4ebef23e17f0`.
+  Recorded Function source checksums matched the published source.
+- Signed `scale_test_status` invocation returned transport HTTP 200 and business
+  `status_code: 200` at 08:57:53 UTC, with `awaiting_pool_enrollment`, zero
+  enrolled pools and `dryRun: true`. Termination remained disabled. No workers
+  were launched. All 160 offline tests also passed again.
+
 ## Remaining qualification
 
-Repeat a **new** GitHub-button deployment from empty stack
-state, then verify successful build, push, x86 Function creation and signed
-standby invocation. A recovered stack or offline engine mocks alone cannot
-establish that clean-deployment result. Standby invocation also does not qualify
-pool-operation permissions or controller scaling behavior.
+The fresh-stack automatic-build path passed in this Ashburn tenancy using an
+existing staging network and an administrator deployer. This is not empty-tenancy
+bootstrap, a least-privilege deployer qualification, or production certification.
+Still qualify different IAM-home/deployment regions, prebuilt-image transitions,
+Function ledger access, pool-operation permissions, controller scaling/recovery
+and customer-scale load. The standby action returns before exercising enrolled
+pool operations; creation of runtime IAM is not proof those operations work.
