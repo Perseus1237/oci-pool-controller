@@ -141,3 +141,91 @@ Your platform registration, or application job readiness.
 The transport follows Oracle's documented
 [FunctionsInvokeClient](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/functions/client/oci.functions.FunctionsInvokeClient.html)
 and [signed Function invocation](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionsinvokingfunctions.htm).
+
+
+
+
+DNAnexus needs to maintain a **shared, transactional control-plane record per pool**. The SQLite outbox in the example is only a single-host reference; production DNAnexus should implement the equivalent in its existing database.
+
+- **Stable pool identity**
+  - `pool_key`
+  - OCI pool OCID
+  - Controller scope/`HarnessId`
+  - Profile/worker type
+  - Region and compartment
+  - Configured maximum capacity and OCPU/VM limits
+
+- **Latest desired capacity**
+  - Absolute desired count of **non-retiring** workers
+  - Strictly increasing `desired_generation`
+  - The complete immutable request payload
+  - A new `request_id` for every changed demand decision
+  - Any worker exclusions
+
+- **Request/outbox state**
+  - Whether each request is pending, completed, failed, or superseded
+  - Last controller response and business status
+  - Retry count and next retry time
+  - Whether an intervention/ operator review is required
+  - OCI work-request IDs and correlation IDs where available
+
+- **Retry and replay ownership**
+  - Which DNAnexus replica owns the next replay/tick
+  - Per-pool lease or fencing information
+  - Backoff/deadline state
+  - The rule that retries reuse the **same request ID, generation, and payload**
+  - Failed or superseded requests must not be automatically regenerated
+
+- **Worker lifecycle and readiness**
+  - Worker OCID and pool membership
+  - DNAnexus registration/heartbeat state
+  - Dispatchable vs booting, unhealthy, draining, or retired
+  - Job assignments and drain status
+  - Confirmation that results and cleanup are complete before retirement
+
+- **Retirement commitments**
+  - Exact worker OCID selected for retirement
+  - Durable retirement request ID
+  - Whether the worker is draining, protection has been committed, detached, terminating, or terminated
+  - A permanent “do not dispatch/reuse” marker once retirement is committed
+  - Retirement retry/progress state
+
+- **Capacity accounting**
+  - Attached workers
+  - Retiring/detached-but-not-terminated workers
+  - Pending launch reservations
+  - OCPU and VM budget consumption
+  - Cross-pool aggregate budget/lease state
+
+- **Operational and migration state**
+  - Last successful reconciliation and last observed pool state
+  - Current controller image/digest and ledger ownership
+  - Alerts/escalations for stuck `SCALING`, failed launches, missing workers, or unavailable ledger state
+  - Audit history sufficient to support rollback and incident review
+
+The critical invariants are:
+
+1. **Persist the request before sending it.**
+2. **Allocate the generation and insert the outbox record atomically.**
+3. **Never change a payload when retrying.**
+4. **Never create competing generation counters on separate replicas.**
+5. **Never dispatch work to a committed retiree.**
+6. **Do not treat OCI pool convergence as DNAnexus worker readiness.**
+7. **Continue periodic replay even after a request reports completed**, because later retirement or drift may require reconciliation.
+
+The project separates this from the controller’s own OCI Object Storage ledger:
+
+| State | DNAnexus responsibility | Controller responsibility |
+|---|---|---|
+| Desired demand | Persist target, generation, request UUID | Validate and retain controller-side request state |
+| Job/worker readiness | Own completely | Does not prove application readiness |
+| Drain decision | Own completely | Enforces retirement commitment once requested |
+| Retry scheduling | Own periodic ticks and replay | Processes one reconciliation attempt per call |
+| OCI capacity/mutation coordination | Track integration state and budget decisions | Persist leases, reservations, retirement records, and pool reconciliation state in Object Storage |
+
+Primary references:
+
+- [`docs/implementation-notes.md`](https://github.com/Perseus1237/oci-pool-controller/blob/main/docs/implementation-notes.md#L43-L69)
+- [`examples/pool_controller.py`](https://github.com/Perseus1237/oci-pool-controller/blob/main/examples/pool_controller.py#L107-L215)
+- [`README.md`](https://github.com/Perseus1237/oci-pool-controller/blob/main/README.md#L87-L115)
+- [`PRODUCT_ARCHITECTURE.md`](https://github.com/Perseus1237/oci-pool-controller/blob/main/PRODUCT_ARCHITECTURE.md#L88-L110)
