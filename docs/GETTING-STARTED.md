@@ -89,8 +89,7 @@ Custom worker images, subnets, encrypted volumes or keys in other compartments c
 
 ### Path A: automatic build, intended one-click experience
 
-**Fresh-stack deployment passed:** Resource Manager assigned an ARM64 Podman
-host in the original test. The corrected stack uses an explicit native x86 OCI
+**Fresh-stack deployment passed:**  The  stack uses an explicit native x86 OCI
 DevOps runner and passed build/private push/deploy/standby invocation through
 the GitHub button. The Docker/Podman compatibility fix alone was insufficient.
 See the [test record](RESOURCE-MANAGER-BUILD-TEST-20260922.md).
@@ -281,3 +280,6 @@ Before calling this customer-ready, have someone unfamiliar with the project fol
 Repository evidence: [builder regression tests](../tests/test_resource_manager_image_build.py)
 and [prior focused live controller results](SCALING_STATE_ACCEPTANCE_20260917.md).
 The prior controller tests are not evidence of a fresh one-click deployment.
+
+
+
